@@ -21,7 +21,7 @@ namespace PetersonCommonDataService.Controllers
         [HttpGet]
         public async Task<IActionResult> GetTasks()
         {
-            long projectId = 2329811342; // Replace with your project ID
+            long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST_PROJECT_ID") ?? "0");
 
             var sections = await _toDoistService.GetSectionsAsync(projectId);
             var tasks = await _toDoistService.GetTasksAsync();
