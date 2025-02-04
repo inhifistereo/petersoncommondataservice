@@ -26,17 +26,7 @@ namespace PetersonCommonDataService.Controllers
             var sections = await _toDoistService.GetSectionsAsync(projectId);
             var tasks = await _toDoistService.GetTasksAsync();
 
-            _logger.LogInformation($"Retrieved {sections.Count} sections");
-            foreach (var section in sections)
-            {
-                _logger.LogInformation($"Section: {section.Id}, Name: {section.Name}");
-            }
-
-            _logger.LogInformation($"Retrieved {tasks.Count} tasks");
-            foreach (var task in tasks)
-            {
-                _logger.LogInformation($"Task: {task.Id}, Content: {task.Content}, SectionId: {task.SectionId}, IsCompleted: {task.IsCompleted}, Labels: {string.Join(", ", task.Labels)}");
-            }
+            _logger.LogInformation($"Retrieved {sections.Count} sections and {tasks.Count} tasks");
 
             var filteredTasks = tasks
                 .Where(task => !task.IsCompleted && task.Labels != null && task.Labels.Contains("DakBoard"))
@@ -48,7 +38,6 @@ namespace PetersonCommonDataService.Controllers
                 if (section != null)
                 {
                     task.Color = section.Name;
-                    _logger.LogInformation($"Task {task.Id} assigned color {task.Color}");
                 }
                 else
                 {
