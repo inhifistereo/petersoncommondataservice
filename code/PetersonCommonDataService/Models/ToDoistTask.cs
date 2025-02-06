@@ -5,10 +5,10 @@ namespace PetersonCommonDataService.Models
     public class ToDoistTask
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
 
         [JsonPropertyName("content")]
-        public string Content { get; set; }
+        public string Content { get; set; } = string.Empty;
 
         [JsonPropertyName("is_completed")]
         public bool IsCompleted { get; set; }
@@ -17,7 +17,7 @@ namespace PetersonCommonDataService.Models
         public List<string> Labels { get; set; } = new List<string>();
 
         [JsonPropertyName("section_id")]
-        public string SectionId { get; set; }
+        public string SectionId { get; set; } = string.Empty;
 
         public string Color { get; set; } = "black"; // Default color
     }
@@ -25,6 +25,6 @@ namespace PetersonCommonDataService.Models
     public class Due
     {
         [JsonPropertyName("date")]
-        public string Date { get; set; }
+        public string Date { get; set; } = string.Empty;
     }
 }

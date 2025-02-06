@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using PetersonCommonDataService.Services;
 using PetersonCommonDataService.Models;
 using Microsoft.Extensions.Logging;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace PetersonCommonDataService.Controllers
 {
@@ -11,15 +13,17 @@ namespace PetersonCommonDataService.Controllers
     {
         private readonly IToDoistService _toDoistService;
         private readonly ILogger<TasksController> _logger;
+        private readonly HttpClient _httpClient;
 
-        public TasksController(IToDoistService toDoistService, ILogger<TasksController> logger)
+        public TasksController(IToDoistService toDoistService, ILogger<TasksController> logger, HttpClient httpClient)
         {
             _toDoistService = toDoistService;
             _logger = logger;
+            _httpClient = httpClient;
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetTasks()
+        [HttpGet("RYG")]
+        public async Task<IActionResult> GetRYGTasks()
         {
             long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST_PROJECT_ID") ?? "0");
 
@@ -37,7 +41,7 @@ namespace PetersonCommonDataService.Controllers
                 var section = sections.FirstOrDefault(s => s.Id == task.SectionId);
                 if (section != null)
                 {
-                    task.Color = section.Name;
+                    task.Color = section.Name.ToUpper(); // Convert to all caps
                 }
                 else
                 {
@@ -48,6 +52,25 @@ namespace PetersonCommonDataService.Controllers
             _logger.LogInformation($"Filtered down to {filteredTasks.Count} tasks");
 
             return Ok(filteredTasks);
+        }
+
+        [HttpGet("getall")]
+        public async Task<IActionResult> GetAllTasks()
+        {
+            long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST_PROJECT_ID") ?? "0");
+
+            var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.todoist.com/rest/v2/tasks?project_id={projectId}");
+            request.Headers.Add("Authorization", $"Bearer {Environment.GetEnvironmentVariable("TODOIST_API_KEY")}");
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var rawJson = await response.Content.ReadAsStringAsync();
+
+            _logger.LogInformation($"Retrieved raw JSON from ToDoist");
+
+            // Return the raw JSON response
+            return Content(rawJson, "application/json");
         }
     }
 }
