@@ -4,6 +4,8 @@ using PetersonCommonDataService.Models;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Linq;
+using System.Text.Json;
 
 namespace PetersonCommonDataService.Controllers
 {
@@ -22,7 +24,7 @@ namespace PetersonCommonDataService.Controllers
             _httpClient = httpClient;
         }
 
-        [HttpGet("RYG")]
+        [HttpGet]
         public async Task<IActionResult> GetRYGTasks()
         {
             long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST_PROJECT_ID") ?? "0");
@@ -51,7 +53,18 @@ namespace PetersonCommonDataService.Controllers
 
             _logger.LogInformation($"Filtered down to {filteredTasks.Count} tasks");
 
-            return Ok(filteredTasks);
+            // Sort tasks by Red, Yellow, Green
+            var sortedTasks = filteredTasks.OrderBy(task => task.Color == "RED" ? 0 : task.Color == "YELLOW" ? 1 : 2).ToList();
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            };
+
+            var json = JsonSerializer.Serialize(sortedTasks, jsonOptions);
+
+            return Content(json, "application/json");
         }
 
         [HttpGet("getall")]
