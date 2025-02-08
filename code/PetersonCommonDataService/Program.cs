@@ -23,7 +23,7 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(options =>
     {
         options.Instance = builder.Configuration["AzureAd:Instance"] ?? string.Empty;
-        options.Domain = builder.Configuration["AzureAd:Domain"];
+        options.Domain = Environment.GetEnvironmentVariable("AZURE_AD_DOMAIN");
         options.TenantId = Environment.GetEnvironmentVariable("AZURE_AD_TENANT_ID");
         options.ClientId = Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID");
         options.ClientSecret = Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_SECRET");

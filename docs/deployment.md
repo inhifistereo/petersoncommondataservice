@@ -4,6 +4,7 @@ To deploy this project, you need to set the following environment variables in t
 
 - `TODOIST_API_KEY=`: Your ToDoist API Key
 - `TODOIST_PROJECT_ID=`: The ToDoist Project you'd like to filter on. Note: You can update ToDoist Models and Controllers so there is no filter. This is specific for my use case. 
+- `AZURE_AD_DOMAIN`: Your Azure AD domain.
 - `AZURE_AD_TENANT_ID`: Your Azure AD Tenant ID.
 - `AZURE_AD_CLIENT_ID`: Your Azure AD Client ID.
 - `AZURE_AD_CLIENT_SECRET`: Your Azure AD Client Secret.
@@ -49,6 +50,7 @@ jobs:
         env:
           TODOIST_API_KEY=: ${{ secrets.TODOIST_API_KEY }}
           TODOIST_PROJECT_ID=: ${{ secrets.TODOIST_PROJECT_ID }}
+          AZURE_AD_DOMAIN: ${{ secrets.AZURE_AD_DOMAIN }}
           AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
           AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
           AZURE_AD_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
