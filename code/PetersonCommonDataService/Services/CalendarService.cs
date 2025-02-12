@@ -1,9 +1,5 @@
 using Microsoft.Graph;
 using PetersonCommonDataService.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace PetersonCommonDataService.Services
 {
@@ -15,8 +11,7 @@ namespace PetersonCommonDataService.Services
         public CalendarService(GraphServiceClient graphServiceClient)
         {
             _graphServiceClient = graphServiceClient;
-            _userEmail = Environment.GetEnvironmentVariable("USER_EMAIL") 
-                ?? throw new InvalidOperationException("USER_EMAIL is missing.");
+            _userEmail = Environment.GetEnvironmentVariable("USER_EMAIL") ?? throw new InvalidOperationException("USER_EMAIL not set.");
         }
 
         public async Task<List<CalendarEvent>> GetCalendarEventsAsync()
@@ -24,19 +19,17 @@ namespace PetersonCommonDataService.Services
             var startDateTime = DateTime.UtcNow.ToString("o"); // ISO 8601 format
             var endDateTime = DateTime.UtcNow.AddDays(5).ToString("o");
 
-            // Format the UPN for guest users
-            var formattedUserEmail = _userEmail.Replace("#EXT#", "_");
-
-            var events = await _graphServiceClient.Users[formattedUserEmail]
+            var events = await _graphServiceClient.Users[_userEmail]
                 .CalendarView
-                .GetAsync(requestConfiguration =>
+                .Request(new[]
                 {
-                    requestConfiguration.QueryParameters.StartDateTime = startDateTime;
-                    requestConfiguration.QueryParameters.EndDateTime = endDateTime;
-                    requestConfiguration.Headers.Add("Prefer", "outlook.timezone=\"UTC\"");
-                });
+                    new QueryOption("startDateTime", startDateTime),
+                    new QueryOption("endDateTime", endDateTime)
+                })
+                .Header("Prefer", "outlook.timezone=\"UTC\"")
+                .GetAsync();
 
-            return events?.Value?.Select(e => new CalendarEvent
+            return events?.CurrentPage?.Select(e => new CalendarEvent
             {
                 Subject = e.Subject ?? "No Subject",
                 Start = ConvertToCentralTime(e.Start),
@@ -44,7 +37,7 @@ namespace PetersonCommonDataService.Services
             }).ToList() ?? new List<CalendarEvent>();
         }
 
-        private DateTime ConvertToCentralTime(Microsoft.Graph.Models.DateTimeTimeZone dateTimeTimeZone)
+        private DateTime ConvertToCentralTime(Microsoft.Graph.DateTimeTimeZone dateTimeTimeZone)
         {
             if (dateTimeTimeZone?.DateTime == null)
             {

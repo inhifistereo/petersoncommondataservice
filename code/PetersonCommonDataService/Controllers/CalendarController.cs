@@ -1,13 +1,10 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PetersonCommonDataService.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using System.Threading.Tasks;
 
 namespace PetersonCommonDataService.Controllers
 {
-    [Authorize] // Ensures only authenticated users can access
     [ApiController]
     [Route("calendar")]
     public class CalendarController : ControllerBase
@@ -23,7 +20,7 @@ namespace PetersonCommonDataService.Controllers
         public async Task<IActionResult> GetCalendarEvents()
         {
             var events = await _calendarService.GetCalendarEventsAsync();
-            return Ok(events);
+            return new JsonResult(events);
         }
 
         [HttpGet("login")]
