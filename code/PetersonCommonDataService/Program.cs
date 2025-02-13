@@ -12,6 +12,7 @@ builder.Configuration.AddEnvironmentVariables();
 
 // ✅ Register HTTP Client
 builder.Services.AddHttpClient();
+builder.Services.AddHttpContextAccessor();
 
 // ✅ 1️⃣ Register Azure AD Authentication FIRST
 builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
@@ -36,9 +37,22 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
 builder.Services.AddScoped<GraphServiceClient>(sp =>
 {
     var tokenAcquisition = sp.GetRequiredService<ITokenAcquisition>();
+    var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var httpContext = httpContextAccessor.HttpContext;
+
+    if (httpContext == null)
+    {
+        throw new InvalidOperationException("HTTP context is null.");
+    }
 
     return new GraphServiceClient(new DelegateAuthenticationProvider(async (requestMessage) =>
     {
+        var user = httpContext.User;
+        if (user == null || !user.Identity.IsAuthenticated)
+        {
+            throw new InvalidOperationException("User is not authenticated.");
+        }
+
         // ✅ Get access token for the authenticated user
         string accessToken = await tokenAcquisition.GetAccessTokenForUserAsync(new[] { "User.Read", "Calendars.Read" });
 

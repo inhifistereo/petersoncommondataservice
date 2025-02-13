@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using PetersonCommonDataService.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 
 namespace PetersonCommonDataService.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("calendar")]
     public class CalendarController : ControllerBase
