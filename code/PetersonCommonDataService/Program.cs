@@ -48,7 +48,7 @@ builder.Services.AddScoped<GraphServiceClient>(sp =>
     return new GraphServiceClient(new DelegateAuthenticationProvider(async (requestMessage) =>
     {
         var user = httpContext.User;
-        if (user == null || !user.Identity.IsAuthenticated)
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
         {
             throw new InvalidOperationException("User is not authenticated.");
         }
