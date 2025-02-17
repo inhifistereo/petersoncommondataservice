@@ -1,34 +1,25 @@
 using Microsoft.AspNetCore.Mvc;
-using PetersonCommonDataService.Services;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.AspNetCore.Authorization;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace PetersonCommonDataService.Controllers
+[ApiController]
+[Route("calendar")]
+public class CalendarController : ControllerBase
 {
-    [Authorize]
-    [ApiController]
-    [Route("calendar")]
-    public class CalendarController : ControllerBase
+    private readonly CalendarService _calendarService;
+    private readonly string _icsUrl;
+
+    public CalendarController(CalendarService calendarService)
     {
-        private readonly CalendarService _calendarService;
+        _calendarService = calendarService;
+        _icsUrl = Environment.GetEnvironmentVariable("ICS_URL") ?? throw new Exception("ICS_URL environment variable not set");
+    }
 
-        public CalendarController(CalendarService calendarService)
-        {
-            _calendarService = calendarService;
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> GetCalendarEvents()
-        {
-            var events = await _calendarService.GetCalendarEventsAsync();
-            return new JsonResult(events);
-        }
-
-        [HttpGet("login")]
-        public IActionResult Login()
-        {
-            return Challenge(new AuthenticationProperties { RedirectUri = "/" }, OpenIdConnectDefaults.AuthenticationScheme);
-        }
+    [HttpGet]
+    public async Task<IActionResult> GetUpcomingEvents()
+    {
+        var events = await _calendarService.GetUpcomingEventsAsync(_icsUrl);
+        return Ok(events);
     }
 }

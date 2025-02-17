@@ -1,56 +1,68 @@
-using Microsoft.Graph;
+using Ical.Net;
+using Ical.Net.CalendarComponents;
+using Ical.Net.DataTypes;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
 using PetersonCommonDataService.Models;
+using TimeZoneConverter;
 
-namespace PetersonCommonDataService.Services
+public class CalendarService
 {
-    public class CalendarService
+    private readonly HttpClient _httpClient;
+    private readonly TimeZoneInfo _centralTimeZone;
+
+    public CalendarService(HttpClient httpClient)
     {
-        private readonly GraphServiceClient _graphServiceClient;
-        private readonly string _userEmail;
+        _httpClient = httpClient;
+        _centralTimeZone = TZConvert.GetTimeZoneInfo("Central Standard Time");
+    }
 
-        public CalendarService(GraphServiceClient graphServiceClient)
+    public async Task<List<PetersonCommonDataService.Models.CalendarEvent>> GetUpcomingEventsAsync(string icsUrl)
+    {
+        var icsContent = await _httpClient.GetStringAsync(icsUrl);
+        var calendar = Calendar.Load(icsContent);
+
+        var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _centralTimeZone).Date;
+        var lastDay = today.AddDays(4); // Today plus 4 days in the future
+
+        Console.WriteLine($"Filtering events from {today} to {lastDay}");
+
+        var events = new List<PetersonCommonDataService.Models.CalendarEvent>();
+
+        foreach (var calendarEvent in calendar.Events)
         {
-            _graphServiceClient = graphServiceClient;
-            _userEmail = Environment.GetEnvironmentVariable("USER_EMAIL") ?? throw new InvalidOperationException("USER_EMAIL not set.");
-        }
+            var occurrences = calendarEvent.GetOccurrences(today, lastDay);
+            foreach (var occurrence in occurrences)
+            {
+                var startDateUtc = occurrence.Period.StartTime.AsUtc;
+                var endDateUtc = occurrence.Period.EndTime.AsUtc;
 
-        public async Task<List<CalendarEvent>> GetCalendarEventsAsync()
-        {
-            var startDateTime = DateTime.UtcNow.ToString("o"); // ISO 8601 format
-            var endDateTime = DateTime.UtcNow.AddDays(5).ToString("o");
+                // Check if the event is an all-day event
+                bool isAllDay = occurrence.Period.StartTime.Value.TimeOfDay == TimeSpan.Zero && occurrence.Period.EndTime.Value.TimeOfDay == TimeSpan.Zero;
 
-            var events = await _graphServiceClient.Users[_userEmail]
-                .CalendarView
-                .Request(new[]
+                var startDate = isAllDay ? TimeZoneInfo.ConvertTimeFromUtc(startDateUtc.Date, _centralTimeZone) : TimeZoneInfo.ConvertTimeFromUtc(startDateUtc, _centralTimeZone);
+                var endDate = isAllDay ? TimeZoneInfo.ConvertTimeFromUtc(endDateUtc.Date, _centralTimeZone) : TimeZoneInfo.ConvertTimeFromUtc(endDateUtc, _centralTimeZone);
+
+                Console.WriteLine($"Event: {calendarEvent.Summary}, Start: {startDate}, All-Day: {isAllDay}");
+
+                events.Add(new PetersonCommonDataService.Models.CalendarEvent
                 {
-                    new QueryOption("startDateTime", startDateTime),
-                    new QueryOption("endDateTime", endDateTime)
-                })
-                .Header("Prefer", "outlook.timezone=\"UTC\"")
-                .GetAsync();
-
-            return events?.CurrentPage?.Select(e => new CalendarEvent
-            {
-                Subject = e.Subject ?? "No Subject",
-                Start = ConvertToCentralTime(e.Start),
-                End = ConvertToCentralTime(e.End)
-            }).ToList() ?? new List<CalendarEvent>();
+                    Subject = calendarEvent.Summary,
+                    Start = startDate,
+                    End = endDate,
+                    IsAllDay = isAllDay // Set the IsAllDay property
+                });
+            }
         }
 
-        private DateTime ConvertToCentralTime(Microsoft.Graph.DateTimeTimeZone dateTimeTimeZone)
-        {
-            if (dateTimeTimeZone?.DateTime == null)
-            {
-                return default(DateTime);
-            }
-
-            if (DateTime.TryParse(dateTimeTimeZone.DateTime, out DateTime parsedDateTime))
-            {
-                TimeZoneInfo centralTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time");
-                return TimeZoneInfo.ConvertTimeFromUtc(parsedDateTime, centralTimeZone);
-            }
-
-            return default(DateTime);
-        }
+        // Sort events by date, with all-day events appearing first for each day
+        return events
+            .OrderBy(e => e.Start.Date)
+            .ThenBy(e => e.IsAllDay ? 0 : 1)
+            .ThenBy(e => e.Start.TimeOfDay)
+            .ToList();
     }
 }

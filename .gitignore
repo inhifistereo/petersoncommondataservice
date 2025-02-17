@@ -364,6 +364,3 @@ FodyWeavers.xsd
 
 # Anything in the ignore directory
 ignore/
-
-# appsettings.json
-appsettings.json
