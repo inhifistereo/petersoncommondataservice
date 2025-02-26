@@ -24,12 +24,8 @@ public class CalendarService
     {
         var icsContent = await _httpClient.GetStringAsync(icsUrl);
         var calendar = Calendar.Load(icsContent);
-
         var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _centralTimeZone).Date;
         var lastDay = today.AddDays(4); // Today plus 4 days in the future
-
-        Console.WriteLine($"Filtering events from {today} to {lastDay}");
-
         var events = new List<PetersonCommonDataService.Models.CalendarEvent>();
 
         foreach (var calendarEvent in calendar.Events)
@@ -45,8 +41,6 @@ public class CalendarService
 
                 var startDate = isAllDay ? TimeZoneInfo.ConvertTimeFromUtc(startDateUtc.Date, _centralTimeZone) : TimeZoneInfo.ConvertTimeFromUtc(startDateUtc, _centralTimeZone);
                 var endDate = isAllDay ? TimeZoneInfo.ConvertTimeFromUtc(endDateUtc.Date, _centralTimeZone) : TimeZoneInfo.ConvertTimeFromUtc(endDateUtc, _centralTimeZone);
-
-                Console.WriteLine($"Event: {calendarEvent.Summary}, Start: {startDate}, All-Day: {isAllDay}");
 
                 events.Add(new PetersonCommonDataService.Models.CalendarEvent
                 {
