@@ -27,7 +27,7 @@ namespace PetersonCommonDataService.Controllers
         [HttpGet]
         public async Task<IActionResult> GetRYGTasks()
         {
-            long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST_PROJECT_ID") ?? "0");
+            long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST-PROJECT-ID") ?? "0");
 
             var sections = await _toDoistService.GetSectionsAsync(projectId);
             var tasks = await _toDoistService.GetTasksAsync();
@@ -70,10 +70,10 @@ namespace PetersonCommonDataService.Controllers
         [HttpGet("getall")]
         public async Task<IActionResult> GetAllTasks()
         {
-            long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST_PROJECT_ID") ?? "0");
+            long projectId = long.Parse(Environment.GetEnvironmentVariable("TODOIST-PROJECT-ID") ?? "0");
 
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.todoist.com/rest/v2/tasks?project_id={projectId}");
-            request.Headers.Add("Authorization", $"Bearer {Environment.GetEnvironmentVariable("TODOIST_API_KEY")}");
+            request.Headers.Add("Authorization", $"Bearer {Environment.GetEnvironmentVariable("TODOIST-API-KEY")}");
 
             var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();

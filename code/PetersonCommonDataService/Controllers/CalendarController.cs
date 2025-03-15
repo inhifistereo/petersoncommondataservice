@@ -13,7 +13,7 @@ public class CalendarController : ControllerBase
     public CalendarController(CalendarService calendarService)
     {
         _calendarService = calendarService;
-        _icsUrl = Environment.GetEnvironmentVariable("ICS_URL") ?? throw new Exception("ICS_URL environment variable not set");
+        _icsUrl = Environment.GetEnvironmentVariable("ICS-URL") ?? throw new Exception("ICS-URL environment variable not set");
     }
 
     [HttpGet]

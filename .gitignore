@@ -364,3 +364,44 @@ FodyWeavers.xsd
 
 # Anything in the ignore directory
 ignore/
+
+# Terraform state files (contain sensitive data)
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate
+*.tfstate.backup
+
+# Terraform crash logs
+crash.log
+crash.*.log
+
+# Terraform CLI configuration (may contain credentials)
+.terraformrc
+terraform.rc
+
+# Local Terraform directories (used for plugin caching)
+.terraform/
+.terraform.lock.hcl
+
+# Ignore override files (local customizations)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore plan files (output of `terraform plan -out=...`)
+*.tfplan
+
+# Ignore logs and debug files
+terraform.log
+debug.log
+*.log
+
+# Ignore Terraform variable files (may contain secrets, if used)
+*.auto.tfvars
+*.tfvars
+*.auto.tfvars.json
+
+# Allow terraform.tfvars.example
+!terraform.tfvars.example
+

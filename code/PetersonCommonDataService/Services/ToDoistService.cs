@@ -18,7 +18,7 @@ namespace PetersonCommonDataService.Services
 
         public ToDoistService(IConfiguration configuration)
         {
-            _apiToken = Environment.GetEnvironmentVariable("TODOIST_API_KEY") ?? throw new Exception("TODOIST_API_KEY environment variable not set");
+            _apiToken = Environment.GetEnvironmentVariable("TODOIST-API-KEY") ?? throw new Exception("TODOIST-API-KEY environment variable not set");
         }
 
         public async Task<List<ToDoistTask>> GetTasksAsync()

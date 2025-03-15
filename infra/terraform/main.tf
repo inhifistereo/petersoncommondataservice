@@ -1,0 +1,139 @@
+# Configure the Azure provider
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.20.0"
+    }
+  }
+  backend "azurerm" {
+    resource_group_name   = "terraform-rg"
+    storage_account_name  = "dptfstate1983"
+    container_name        = "tfstate"
+    key                   = "terraform.tfstate"
+  }
+}
+
+provider "azurerm" {
+  features {}
+  subscription_id = var.subscription_id
+  tenant_id       = var.tenant_id
+}
+
+resource "azurerm_resource_group" "rg" {
+  name     = var.resource_group_name
+  location = var.location
+}
+
+resource "azurerm_log_analytics_workspace" "log_analytics" {
+  name                = var.log_analytics_workspace_name
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+resource "azurerm_container_app_environment" "env" {
+  name                       = var.container_apps_environment_name
+  location                   = var.location
+  resource_group_name        = azurerm_resource_group.rg.name
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
+
+}
+
+resource "azurerm_key_vault" "kv" {
+  name                = var.key_vault_name
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku_name            = "standard"
+
+  enable_rbac_authorization   = true
+
+  tenant_id                = data.azurerm_client_config.current.tenant_id
+  purge_protection_enabled = false
+}
+
+# More secure: Disable ACR admin credentials
+resource "azurerm_container_registry" "acr" {
+  name                = var.container_registry_name
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "Basic"
+  admin_enabled       = false
+}
+
+# Secure Container App using Managed Identity
+resource "azurerm_container_app" "app" {
+  name                         = var.container_app_name
+  resource_group_name          = azurerm_resource_group.rg.name
+  container_app_environment_id = azurerm_container_app_environment.env.id
+  revision_mode                = "Single"
+
+  # Enable SystemAssigned Managed Identity
+  identity {
+    type = "SystemAssigned"
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 80  # HTTPS traffic
+    transport        = "auto"
+
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+
+  template {
+    container {
+      name   = "nginx"
+      image  = "nginx:latest"
+      cpu    = 0.5
+      memory = "1Gi"
+    }
+  }
+}
+
+# Assign Key Vault Secrets User role to the Container App's Managed Identity
+resource "azurerm_role_assignment" "kv_secrets_user" {
+  principal_id         = azurerm_container_app.app.identity[0].principal_id
+  role_definition_name = "Key Vault Secrets User"
+  scope                = azurerm_key_vault.kv.id
+}
+
+resource "azurerm_key_vault_secret" "ics_url" {
+  name         = "ICS-URL"
+  value        = var.ics_url
+  key_vault_id = azurerm_key_vault.kv.id
+}
+
+resource "azurerm_key_vault_secret" "todoist_api_key" {
+  name         = "TODOIST-API-KEY"
+  value        = var.todoist_api_key
+  key_vault_id = azurerm_key_vault.kv.id
+}
+
+resource "azurerm_key_vault_secret" "todoist_project_id" {
+  name         = "TODOIST-PROJECT-ID"
+  value        = var.todoist_project_id
+  key_vault_id = azurerm_key_vault.kv.id
+}
+
+resource "azurerm_container_app_custom_domain" "custom_domain" {
+  container_app_id = azurerm_container_app.app.id
+  name = var.domain_name
+
+  lifecycle {
+    # When using an Azure created Managed Certificate these values must be added to ignore_changes
+    ignore_changes = [certificate_binding_type, container_app_environment_certificate_id]
+  }
+}
+
+# Get Azure Client Config
+data "azurerm_client_config" "current" {}
+
+# Output the Container App URL
+output "container_app_url" {
+  value = azurerm_container_app.app.latest_revision_fqdn
+}
