@@ -1,0 +1,6 @@
+domain_name = "{your-domain-here}"
+ics_url = "{your-ics-url-here}"
+subscription_id = "{your-azure-subscription-id-here}"
+tenant_id = "{your-azure-tenant-id-here}"
+todoist_api_key = "{your-todoist-api-key-here}"
+todoist_project_id = "{your-todoist-project-id-here}"
