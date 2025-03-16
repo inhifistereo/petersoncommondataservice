@@ -48,12 +48,12 @@ jobs:
         terraform init -backend-config="storage_account_name=${{ secrets.TF_STORAGE_ACCOUNT }}" \
                        -backend-config="container_name=${{ secrets.TF_CONTAINER }}" \
                        -backend-config="key=${{ secrets.TF_STATE_KEY }}" \
-                       -backend-config="domain_name=${{ secrets.TF_VAR_DOMAIN_NAME }}"
                        -backend-config="use_azuread_auth=true" \
                        -backend-config="subscription_id=${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}" \
                        -backend-config="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}" \
                        -backend-config="client_id=${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}" \
-                       -backend-config="client_secret=${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}"
+                       -backend-config="client_secret=${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}" \
+                       -var="domain_name=${{ secrets.TF_VAR_DOMAIN_NAME }}" \
       
     - name: Terraform Plan
       run: |
