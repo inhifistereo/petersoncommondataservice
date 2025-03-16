@@ -62,35 +62,65 @@ resource "azurerm_container_registry" "acr" {
   admin_enabled       = false
 }
 
-# Secure Container App using Managed Identity
 resource "azurerm_container_app" "app" {
   name                         = var.container_app_name
   resource_group_name          = azurerm_resource_group.rg.name
   container_app_environment_id = azurerm_container_app_environment.env.id
   revision_mode                = "Single"
-
+  
   # Enable SystemAssigned Managed Identity
   identity {
     type = "SystemAssigned"
   }
-
+  
+  # Define the secrets
+  secret {
+    name  = "ics-url-secret"
+    value = azurerm_key_vault_secret.ics_url.value
+  }
+  
+  secret {
+    name  = "todoist-api-key-secret"
+    value = azurerm_key_vault_secret.todoist_api_key.value
+  }
+  
+  secret {
+    name  = "todoist-project-id-secret"
+    value = azurerm_key_vault_secret.todoist_project_id.value
+  }
+  
   ingress {
     external_enabled = true
-    target_port      = 80  # HTTPS traffic
+    target_port      = 80
     transport        = "auto"
-
     traffic_weight {
       latest_revision = true
       percentage      = 100
     }
   }
-
+  
   template {
     container {
       name   = "nginx"
       image  = "nginx:latest"
       cpu    = 0.5
       memory = "1Gi"
+      
+      # Map secrets to environment variables
+      env {
+        name        = "ICS_URL"
+        secret_name = "ics-url-secret"
+      }
+      
+      env {
+        name        = "TODOIST_API_KEY"
+        secret_name = "todoist-api-key-secret"
+      }
+      
+      env {
+        name        = "TODOIST_PROJECT_ID"
+        secret_name = "todoist-project-id-secret"
+      }
     }
   }
 }
