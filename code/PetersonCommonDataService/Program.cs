@@ -19,12 +19,14 @@ builder.Services.AddRazorPages();
 // ✅ Register Services
 builder.Services.AddScoped<IToDoistService, ToDoistService>(); // ToDoist Service
 builder.Services.AddScoped<CalendarService>(); // Calendar Service
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
 app.UseRouting();
+
+app.MapHealthChecks("/health");
 
 app.MapControllers();
 app.MapRazorPages();

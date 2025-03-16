@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Ical.Net" Version="5.0.0-pre.40" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.3" />
     <PackageReference Include="RestSharp" Version="112.1.0" />
     <PackageReference Include="TimeZoneConverter" Version="7.0.0" />
   </ItemGroup>
