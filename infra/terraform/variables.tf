@@ -62,6 +62,6 @@ variable "tenant_id" {
 }
 
 variable "domain_name" {
-  description = "Custom domain name for the application"
+  description = "Custom domain name for the application."
   type        = string
 }
