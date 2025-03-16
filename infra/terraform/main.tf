@@ -101,8 +101,8 @@ resource "azurerm_container_app" "app" {
   
   template {
     container {
-      name   = "nginx"
-      image  = "nginx:latest"
+      name   = "petersoncommondataservice"
+      image  = "${var.acr_name}.azurecr.io/petersoncommondataservice:latest"
       cpu    = 0.5
       memory = "1Gi"
       
