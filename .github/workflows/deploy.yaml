@@ -53,7 +53,6 @@ jobs:
                        -backend-config="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}" \
                        -backend-config="client_id=${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}" \
                        -backend-config="client_secret=${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}" \
-                       -var="domain_name=${{ secrets.TF_VAR_DOMAIN_NAME }}" \
       
     - name: Terraform Plan
       run: |
@@ -62,6 +61,7 @@ jobs:
                        -var="todoist_api_key=${{ secrets.TODOIST_API_KEY }}" \
                        -var="todoist_project_id=${{ secrets.TODOIST_PROJECT_ID }}" \
                        -var="container_app_name=petersoncommondataservice" \
+                       -var="domain_name=${{ secrets.TF_VAR_DOMAIN_NAME }}" \
                        -out=tfplan
                        
     - name: Terraform Apply
