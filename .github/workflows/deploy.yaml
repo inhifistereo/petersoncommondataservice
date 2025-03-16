@@ -61,6 +61,8 @@ jobs:
                        -var="todoist_api_key=${{ secrets.TODOIST_API_KEY }}" \
                        -var="todoist_project_id=${{ secrets.TODOIST_PROJECT_ID }}" \
                        -var="domain_name=${{ secrets.TF_VAR_DOMAIN_NAME }}" \
+                       -var="subscription_id=${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}" \
+                       -var="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}" \
                        -out=tfplan
                        
     - name: Terraform Apply
