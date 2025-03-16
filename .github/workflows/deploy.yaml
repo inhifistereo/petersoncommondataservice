@@ -50,7 +50,7 @@ jobs:
                        -backend-config="key=${{ secrets.TF_STATE_KEY }}" \
                        -backend-config="use_azuread_auth=true" \
                        -backend-config="subscription_id=${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}" \
-                       -backend-config="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}" \
+                       -backend-config="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenant }}" \
                        -backend-config="client_id=${{ fromJson(secrets.AZURE_CREDENTIALS).appId }}" \
                        -backend-config="client_secret=${{ fromJson(secrets.AZURE_CREDENTIALS).password }}"
       
