@@ -20,8 +20,8 @@ jobs:
       uses: azure/docker-login@v1
       with:
         login-server: ${{ secrets.ACR_SERVER }}
-        username: ${{ fromJson(secrets.AZURE_CREDENTIALS).appId }}
-        password: ${{ fromJson(secrets.AZURE_CREDENTIALS).password }}
+        username: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
+        password: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}
         
     - name: Build and push Docker image to ACR
       uses: docker/build-push-action@v2
@@ -50,9 +50,9 @@ jobs:
                        -backend-config="key=${{ secrets.TF_STATE_KEY }}" \
                        -backend-config="use_azuread_auth=true" \
                        -backend-config="subscription_id=${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}" \
-                       -backend-config="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenant }}" \
-                       -backend-config="client_id=${{ fromJson(secrets.AZURE_CREDENTIALS).appId }}" \
-                       -backend-config="client_secret=${{ fromJson(secrets.AZURE_CREDENTIALS).password }}"
+                       -backend-config="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}" \
+                       -backend-config="client_id=${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}" \
+                       -backend-config="client_secret=${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}"
       
     - name: Terraform Plan
       run: |
