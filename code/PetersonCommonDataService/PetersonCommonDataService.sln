@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PetersonCommonDataService", "PetersonCommonDataService.csproj", "{5CC0EDDF-10E0-3257-8606-0854645E2D18}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5CC0EDDF-10E0-3257-8606-0854645E2D18}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5CC0EDDF-10E0-3257-8606-0854645E2D18}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5CC0EDDF-10E0-3257-8606-0854645E2D18}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5CC0EDDF-10E0-3257-8606-0854645E2D18}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5FEC7918-97B0-4BF7-BEA8-544D51A10338}
+	EndGlobalSection
+EndGlobal

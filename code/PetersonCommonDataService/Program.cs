@@ -1,12 +1,18 @@
 using PetersonCommonDataService.Services;
 using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ✅ Load Configuration (appsettings.json & Environment Variables)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(8080); // HTTP only, no HTTPS
+});
+
+// Configure the application configuration
+builder.Configuration.Sources.Clear();
 builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 builder.Configuration.AddEnvironmentVariables();
-
 // ✅ Register HTTP Client
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<CalendarService>();
@@ -23,7 +29,6 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
 app.UseRouting();
 
 app.MapHealthChecks("/health");

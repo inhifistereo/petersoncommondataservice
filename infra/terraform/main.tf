@@ -88,7 +88,7 @@ resource "azurerm_container_app" "app" {
     name  = "todoist-project-id-secret"
     value = azurerm_key_vault_secret.todoist_project_id.value
   }
-  
+
   ingress {
     external_enabled = true
     target_port      = 80
@@ -125,6 +125,17 @@ resource "azurerm_container_app" "app" {
       env {
         name        = "TODOIST_PROJECT_ID"
         secret_name = "todoist-project-id-secret"
+      }
+
+      # Add Kestrel/ASP.NET Core configuration
+      env {
+        name  = "DOTNET_URLS"
+        value = "http://+:80"
+      }
+      
+      env {
+        name  = "ASPNETCORE_ENVIRONMENT"
+        value = "Production"
       }
     }
   }

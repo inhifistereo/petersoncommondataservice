@@ -9,6 +9,8 @@ WORKDIR /src
 COPY ["code/PetersonCommonDataService/PetersonCommonDataService.csproj", "code/PetersonCommonDataService/"]
 RUN dotnet restore "code/PetersonCommonDataService/PetersonCommonDataService.csproj"
 COPY . .
+# Remove Properties folder to avoid HTTPS configuration issues
+RUN rm -rf /src/code/PetersonCommonDataService/Properties
 WORKDIR "/src/code/PetersonCommonDataService"
 RUN dotnet build "PetersonCommonDataService.csproj" -c Release -o /app/build
 
@@ -19,17 +21,11 @@ RUN dotnet publish "PetersonCommonDataService.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 
-# Configure for production
-ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:80
-ENV Kestrel__Endpoints__Https__Url=""
-ENV Kestrel__Endpoints__Http__Url="http://+:80"
+# Copy only the published app
+COPY --from=publish /app/publish .
 
 # Create an empty wwwroot directory if needed
 RUN mkdir -p /app/wwwroot
-
-# Copy only the published app
-COPY --from=publish /app/publish .
 
 # Install curl for health check
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
