@@ -4,10 +4,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.ListenAnyIP(8080); // HTTP only, no HTTPS
-});
+builder.WebHost.UseUrls("http://*:8080");
 
 // Configure the application configuration
 builder.Configuration.Sources.Clear();

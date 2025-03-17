@@ -149,12 +149,6 @@ resource "azurerm_container_app" "app" {
         name        = "TODOIST_PROJECT_ID"
         secret_name = "todoist-project-id-secret"
       }
-
-      # Add Kestrel/ASP.NET Core configuration
-      env {
-        name  = "DOTNET_URLS"
-        value = "http://+:8080"
-      }
       
       env {
         name  = "ASPNETCORE_ENVIRONMENT"
@@ -164,11 +158,6 @@ resource "azurerm_container_app" "app" {
       env {
         name  = "ASPNETCORE_HTTP_PORTS"
         value = "8080"
-      }
-
-      env {
-        name  = "ASPNETCORE_URLS"
-        value = "http://+:8080"
       }
     }
   }
