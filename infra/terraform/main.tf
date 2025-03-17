@@ -110,6 +110,25 @@ resource "azurerm_container_app" "app" {
       image  = "${var.container_registry_name}.azurecr.io/petersoncommondataservice:latest"
       cpu    = 0.5
       memory = "1Gi"
+
+      # Define health probes
+    liveness_probe {
+      path                = "/health"
+      port                = 80
+      initial_delay_seconds = 30
+      timeout_seconds     = 5
+      period_seconds      = 10
+      failure_threshold   = 3
+    }
+    
+    startup_probe {
+      path                = "/health"
+      port                = 80
+      initial_delay_seconds = 15
+      timeout_seconds     = 5
+      period_seconds      = 5
+      failure_threshold   = 10
+    }
       
       # Map secrets to environment variables
       env {
