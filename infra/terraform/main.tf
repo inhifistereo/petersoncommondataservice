@@ -114,7 +114,7 @@ resource "azurerm_container_app" "app" {
       #Define health probes with correct syntax
       liveness_probe {
         transport = "HTTP"
-        port      = 80
+        port      = 8080
         path      = "/health"
         
         initial_delay         = 30
@@ -125,7 +125,7 @@ resource "azurerm_container_app" "app" {
     
       startup_probe {
         transport = "HTTP"
-        port      = 80
+        port      = 8080
         path      = "/health"
         
         initial_delay         = 15
@@ -153,7 +153,7 @@ resource "azurerm_container_app" "app" {
       # Add Kestrel/ASP.NET Core configuration
       env {
         name  = "DOTNET_URLS"
-        value = "http://+:80"
+        value = "http://+:8080"
       }
       
       env {
