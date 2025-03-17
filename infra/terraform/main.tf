@@ -160,6 +160,16 @@ resource "azurerm_container_app" "app" {
         name  = "ASPNETCORE_ENVIRONMENT"
         value = "Production"
       }
+
+      env {
+        name  = "ASPNETCORE_HTTP_PORTS"
+        value = "8080"
+      }
+
+      env {
+        name  = "ASPNETCORE_URLS"
+        value = "http://+:8080"
+      }
     }
   }
 }
