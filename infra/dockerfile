@@ -38,5 +38,13 @@ HEALTHCHECK --interval=30s --timeout=3s \
 LABEL org.opencontainers.image.description="Peterson Common Data Service API"
 LABEL org.opencontainers.image.created="${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}"
 
-# Run as root for now
+# Create a non-root user
+RUN adduser --disabled-password --gecos "" appuser && \
+    chown -R appuser /app
+
+# Enable the new .NET 8 socket reuse feature
+ENV DOTNET_SYSTEM_NET_DISABLEIPV6 =true
+ENV DOTNET_SYSTEM_NET_SOCKETSHTTPLISTENER_SOCKETREUSE=1
+
+USER appuser
 ENTRYPOINT ["dotnet", "PetersonCommonDataService.dll"]
