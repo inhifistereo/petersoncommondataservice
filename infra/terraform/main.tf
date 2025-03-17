@@ -111,24 +111,28 @@ resource "azurerm_container_app" "app" {
       cpu    = 0.5
       memory = "1Gi"
 
-      # Define health probes
-    liveness_probe {
-      path                = "/health"
-      port                = 80
-      initial_delay_seconds = 30
-      timeout_seconds     = 5
-      period_seconds      = 10
-      failure_threshold   = 3
-    }
+      #Define health probes with correct syntax
+      liveness_probe {
+        transport = "HTTP"
+        port      = 80
+        path      = "/health"
+        
+        initial_delay_seconds = 30
+        interval_seconds      = 10
+        timeout_seconds       = 5
+        failure_count_threshold = 3
+      }
     
-    startup_probe {
-      path                = "/health"
-      port                = 80
-      initial_delay_seconds = 15
-      timeout_seconds     = 5
-      period_seconds      = 5
-      failure_threshold   = 10
-    }
+      startup_probe {
+        transport = "HTTP"
+        port      = 80
+        path      = "/health"
+        
+        initial_delay_seconds = 15
+        interval_seconds      = 5
+        timeout_seconds       = 5
+        failure_count_threshold = 10
+      }
       
       # Map secrets to environment variables
       env {
