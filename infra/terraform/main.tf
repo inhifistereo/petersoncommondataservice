@@ -136,17 +136,17 @@ resource "azurerm_container_app" "app" {
       
       # Map secrets to environment variables
       env {
-        name        = "ICS_URL"
+        name        = "ICS-URL"
         secret_name = "ics-url-secret"
       }
       
       env {
-        name        = "TODOIST_API_KEY"
+        name        = "TODOIST-API-KEY"
         secret_name = "todoist-api-key-secret"
       }
       
       env {
-        name        = "TODOIST_PROJECT_ID"
+        name        = "TODOIST-PROJECT-ID"
         secret_name = "todoist-project-id-secret"
       }
       
