@@ -1,7 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 [ApiController]
 [Route("calendar")]
@@ -20,6 +17,6 @@ public class CalendarController : ControllerBase
     public async Task<IActionResult> GetUpcomingEvents()
     {
         var events = await _calendarService.GetUpcomingEventsAsync(_icsUrl);
-        return Ok(events);
+        return new JsonResult(events);
     }
 }
