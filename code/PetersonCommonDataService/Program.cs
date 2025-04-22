@@ -10,6 +10,7 @@ builder.WebHost.UseUrls("http://*:8080");
 builder.Configuration.Sources.Clear();
 builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 builder.Configuration.AddEnvironmentVariables();
+
 // ✅ Register HTTP Client
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<CalendarService>();
@@ -24,9 +25,23 @@ builder.Services.AddScoped<IToDoistService, ToDoistService>(); // ToDoist Servic
 builder.Services.AddScoped<CalendarService>(); // Calendar Service
 builder.Services.AddHealthChecks();
 
+// ✅ Add CORS Policy
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigin", policy =>
+    {
+        policy.WithOrigins("https://app.devin.ai")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
 app.UseRouting();
+
+// ✅ Use CORS Middleware
+app.UseCors("AllowSpecificOrigin");
 
 app.MapHealthChecks("/health");
 
