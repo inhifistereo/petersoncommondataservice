@@ -38,10 +38,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.UseRouting();
-
 // ✅ Use CORS Middleware
 app.UseCors("AllowSpecificOrigin");
+app.UseRouting();
 
 app.MapHealthChecks("/health");
 
