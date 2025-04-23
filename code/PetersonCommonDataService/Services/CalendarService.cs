@@ -1,13 +1,14 @@
-using Ical.Net;
+﻿using Ical.Net;
 using Ical.Net.CalendarComponents;
-using Ical.Net.DataTypes;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using PetersonCommonDataService.Models;
 using TimeZoneConverter;
+using CalendarEvent = PetersonCommonDataService.Models.CalendarEvent;
 
 public class CalendarService
 {
@@ -20,47 +21,77 @@ public class CalendarService
         _centralTimeZone = TZConvert.GetTimeZoneInfo("Central Standard Time");
     }
 
-    public async Task<List<PetersonCommonDataService.Models.CalendarEvent>> GetUpcomingEventsAsync(string icsUrl)
+    public async Task<List<CalendarEvent>> GetUpcomingEventsAsync(string icsUrl)
     {
         var icsContent = await _httpClient.GetStringAsync(icsUrl);
-        var calendar = Calendar.Load(icsContent);
+        var calendar = Ical.Net.Calendar.Load(icsContent);
+
+        // our 5-day window in local Central time
         var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _centralTimeZone).Date;
-        var lastDay = today.AddDays(5); // Today plus 4 days in the future
-        var events = new List<PetersonCommonDataService.Models.CalendarEvent>();
+        var lastDay = today.AddDays(5);
 
-        foreach (var calendarEvent in calendar.Events)
+        var events = new List<CalendarEvent>();
+
+        foreach (var vevent in calendar.Events)
         {
-            var occurrences = calendarEvent.GetOccurrences(today, lastDay);
-            foreach (var occurrence in occurrences)
+            // true date-only detection
+            bool isAllDay = !vevent.DtStart.HasTime
+                         && !vevent.DtEnd.HasTime;
+
+            var occurrences = vevent.GetOccurrences(today, lastDay);
+            foreach (var occ in occurrences)
             {
-                var startDateUtc = occurrence.Period.StartTime.AsUtc;
-                var endDateUtc = occurrence.Period.EndTime.AsUtc;
-
-                // Check if the event is an all-day event
-                bool isAllDay = occurrence.Period.StartTime.Value.TimeOfDay == TimeSpan.Zero && occurrence.Period.EndTime.Value.TimeOfDay == TimeSpan.Zero;
-
-                var startDate = isAllDay 
-                    ? TimeZoneInfo.ConvertTimeFromUtc(startDateUtc.Date, _centralTimeZone).Date 
-                    : TimeZoneInfo.ConvertTimeFromUtc(startDateUtc, _centralTimeZone);
-                var endDate = isAllDay 
-                    ? TimeZoneInfo.ConvertTimeFromUtc(endDateUtc.Date, _centralTimeZone).Date.AddDays(1) // Make end date exclusive
-                    : TimeZoneInfo.ConvertTimeFromUtc(endDateUtc, _centralTimeZone);
-
-                events.Add(new PetersonCommonDataService.Models.CalendarEvent
+                if (isAllDay)
                 {
-                    Subject = calendarEvent.Summary,
-                    Start = startDate,
-                    End = endDate,
-                    IsAllDay = isAllDay // Set the IsAllDay property
-                });
+                    // raw start date
+                    var startDate = occ.Period.StartTime.Value.Date;
+                    // dtEnd from ICS is exclusive → subtract 1 day to make it inclusive
+                    var endInclusive = occ.Period.EndTime.Value.Date.AddDays(-1);
+
+                    events.Add(new CalendarEvent
+                    {
+                        Subject = vevent.Summary,
+                        Start = startDate.ToString("yyyy-MM-dd"),    // e.g. "2025-04-22"
+                        End = endInclusive.ToString("yyyy-MM-dd"),  // now "2025-04-24"
+                        IsAllDay = true
+                    });
+                }
+                else
+                {
+                    // timed events: UTC→Central, full ISO local
+                    var startUtc = occ.Period.StartTime.AsUtc;
+                    var endUtc = occ.Period.EndTime.AsUtc;
+                    var localStart = TimeZoneInfo.ConvertTimeFromUtc(startUtc, _centralTimeZone);
+                    var localEnd = TimeZoneInfo.ConvertTimeFromUtc(endUtc, _centralTimeZone);
+
+                    events.Add(new CalendarEvent
+                    {
+                        Subject = vevent.Summary,
+                        Start = localStart.ToString("yyyy-MM-dd'T'HH:mm:ss"),
+                        End = localEnd.ToString("yyyy-MM-dd'T'HH:mm:ss"),
+                        IsAllDay = false
+                    });
+                }
             }
         }
 
-        // Sort events by date, with all-day events appearing first for each day
+        // finally, sort by day → all-day first → clock time
         return events
-            .OrderBy(e => e.Start.Date)
-            .ThenBy(e => e.IsAllDay ? 0 : 1)
-            .ThenBy(e => e.Start.TimeOfDay)
-            .ToList();
+          .Select(e => new
+          {
+              E = e,
+              StartDt = DateTime.ParseExact(
+                e.Start,
+                e.IsAllDay
+                  ? "yyyy-MM-dd"
+                  : "yyyy-MM-dd'T'HH:mm:ss",
+                CultureInfo.InvariantCulture
+              )
+          })
+          .OrderBy(x => x.StartDt.Date)
+          .ThenBy(x => x.E.IsAllDay ? 0 : 1)
+          .ThenBy(x => x.StartDt.TimeOfDay)
+          .Select(x => x.E)
+          .ToList();
     }
 }
