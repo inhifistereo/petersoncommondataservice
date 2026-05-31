@@ -7,10 +7,10 @@ public class CalendarController : ControllerBase
     private readonly CalendarService _calendarService;
     private readonly string _icsUrl;
 
-    public CalendarController(CalendarService calendarService)
+    public CalendarController(CalendarService calendarService, IConfiguration configuration)
     {
         _calendarService = calendarService;
-        _icsUrl = Environment.GetEnvironmentVariable("ICS-URL") ?? throw new Exception("ICS-URL environment variable not set");
+        _icsUrl = configuration["ICS-URL"] ?? throw new Exception("ICS-URL is not configured");
     }
 
     [HttpGet]

@@ -6,6 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.UseUrls("http://*:8080");
 
+if (builder.Environment.IsDevelopment())
+{
+    DotNetEnv.Env.Load();
+}
+
 // Configure the application configuration
 builder.Configuration.Sources.Clear();
 builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);

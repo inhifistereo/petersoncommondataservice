@@ -18,11 +18,6 @@ variable "container_apps_environment_name" {
   default     = "env-petersoncommondataservice"
 }
 
-variable "key_vault_name" {
-  description = "The name of the Key Vault"
-  default     = "keyvault-pcds"
-}
-
 variable "container_registry_name" {
   description = "The name of the Container Registry"
   default     = "acrpetersoncommondataservice"

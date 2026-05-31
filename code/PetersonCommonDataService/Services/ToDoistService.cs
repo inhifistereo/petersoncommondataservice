@@ -9,46 +9,46 @@ namespace PetersonCommonDataService.Services
     public interface IToDoistService
     {
         Task<List<ToDoistTask>> GetTasksAsync();
-        Task<List<ToDoistSection>> GetSectionsAsync(long projectId);
+        Task<List<ToDoistSection>> GetSectionsAsync(string projectId);
     }
 
     public class ToDoistService : IToDoistService
     {
+        private readonly RestClient _restClient;
         private readonly string _apiToken;
 
         public ToDoistService(IConfiguration configuration)
         {
-            _apiToken = Environment.GetEnvironmentVariable("TODOIST-API-KEY") ?? throw new Exception("TODOIST-API-KEY environment variable not set");
+            _apiToken = configuration["TODOIST-API-KEY"] ?? throw new Exception("TODOIST-API-KEY is not configured");
+            _restClient = new RestClient("https://api.todoist.com/api/v1");
         }
 
         public async Task<List<ToDoistTask>> GetTasksAsync()
         {
-            var client = new RestClient("https://api.todoist.com/rest/v2");
             var request = new RestRequest("tasks", Method.Get);
             request.AddHeader("Authorization", $"Bearer {_apiToken}");
 
-            var response = await client.ExecuteAsync(request);
+            var response = await _restClient.ExecuteAsync(request);
             if (!response.IsSuccessful)
             {
-                throw new Exception("Error querying ToDoist API");
+                throw new Exception($"Todoist API error on tasks: {(int)response.StatusCode} {response.StatusCode} — {response.Content}");
             }
 
-            return JsonSerializer.Deserialize<List<ToDoistTask>>(response.Content);
+            return (JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistTask>>(response.Content) ?? new()).Results;
         }
 
-        public async Task<List<ToDoistSection>> GetSectionsAsync(long projectId)
+        public async Task<List<ToDoistSection>> GetSectionsAsync(string projectId)
         {
-            var client = new RestClient("https://api.todoist.com/rest/v2");
             var request = new RestRequest($"sections?project_id={projectId}", Method.Get);
             request.AddHeader("Authorization", $"Bearer {_apiToken}");
 
-            var response = await client.ExecuteAsync(request);
+            var response = await _restClient.ExecuteAsync(request);
             if (!response.IsSuccessful)
             {
-                throw new Exception("Error querying ToDoist API");
+                throw new Exception($"Todoist API error on sections (project {projectId}): {(int)response.StatusCode} {response.StatusCode} — {response.Content}");
             }
 
-            return JsonSerializer.Deserialize<List<ToDoistSection>>(response.Content);
+            return (JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistSection>>(response.Content) ?? new()).Results;
         }
     }
 }

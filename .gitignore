@@ -405,3 +405,8 @@ debug.log
 # Allow terraform.tfvars.example
 !terraform.tfvars.example
 
+# Local dev environment secrets
+.env
+*.env
+!*.env.example
+
