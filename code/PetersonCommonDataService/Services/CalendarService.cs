@@ -1,97 +1,90 @@
-﻿using Ical.Net;
-using Ical.Net.CalendarComponents;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Net.Http;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using PetersonCommonDataService.Configuration;
+using PetersonCommonDataService.Errors;
 using PetersonCommonDataService.Models;
-using TimeZoneConverter;
-using CalendarEvent = PetersonCommonDataService.Models.CalendarEvent;
 
-public class CalendarService
+namespace PetersonCommonDataService.Services;
+
+/// <summary>
+/// Fetches the published ICS feed and expands it into display occurrences.
+/// </summary>
+/// <remarks>
+/// Fetching is kept separate from parsing: the transport lives here, while all the
+/// awkward calendar semantics live in the pure <see cref="IcsEventExpander"/>.
+/// </remarks>
+public sealed class CalendarService(
+    HttpClient httpClient,
+    IcsEventExpander expander,
+    IOptions<CalendarOptions> options,
+    ILogger<CalendarService> logger)
 {
-    private readonly HttpClient _httpClient;
-    private readonly TimeZoneInfo _centralTimeZone;
+    private const string UpstreamName = "ics";
 
-    public CalendarService(HttpClient httpClient)
+    private readonly CalendarOptions _options = options.Value;
+
+    /// <summary>Resolved once so an invalid configured zone fails loudly rather than silently defaulting.</summary>
+    public TimeZoneInfo TimeZone { get; } = ResolveTimeZone(options.Value.TimeZone);
+
+    public async Task<IReadOnlyList<CalendarEvent>> GetEventsAsync(
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        CancellationToken cancellationToken = default)
     {
-        _httpClient = httpClient;
-        _centralTimeZone = TZConvert.GetTimeZoneInfo("Central Standard Time");
+        var ics = await DownloadAsync(cancellationToken);
+
+        try
+        {
+            var events = expander.Expand(ics, windowStart, windowEnd, TimeZone);
+            logger.LogInformation(
+                "Expanded {EventCount} occurrences between {WindowStart} and {WindowEnd}",
+                events.Count, windowStart, windowEnd);
+            return events;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new UpstreamException(UpstreamName, null, "The calendar feed could not be parsed.", ex);
+        }
     }
 
-    public async Task<List<CalendarEvent>> GetUpcomingEventsAsync(string icsUrl)
+    private async Task<string> DownloadAsync(CancellationToken cancellationToken)
     {
-        var icsContent = await _httpClient.GetStringAsync(icsUrl);
-        var calendar = Ical.Net.Calendar.Load(icsContent);
-
-        // our 5-day window in local Central time
-        var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _centralTimeZone).Date;
-        var lastDay = today.AddDays(5);
-
-        var events = new List<CalendarEvent>();
-
-        foreach (var vevent in calendar.Events)
+        HttpResponseMessage response;
+        try
         {
-            // true date-only detection
-            bool isAllDay = !vevent.DtStart.HasTime
-                         && !vevent.DtEnd.HasTime;
-
-            var occurrences = vevent.GetOccurrences(today, lastDay);
-            foreach (var occ in occurrences)
-            {
-                if (isAllDay)
-                {
-                    // raw start date
-                    var startDate = occ.Period.StartTime.Value.Date;
-                    // dtEnd from ICS is exclusive → subtract 1 day to make it inclusive
-                    var endInclusive = occ.Period.EndTime.Value.Date.AddDays(-1);
-
-                    events.Add(new CalendarEvent
-                    {
-                        Subject = vevent.Summary,
-                        Start = startDate.ToString("yyyy-MM-dd"),    // e.g. "2025-04-22"
-                        End = endInclusive.ToString("yyyy-MM-dd"),  // now "2025-04-24"
-                        IsAllDay = true
-                    });
-                }
-                else
-                {
-                    // timed events: UTC→Central, full ISO local
-                    var startUtc = occ.Period.StartTime.AsUtc;
-                    var endUtc = occ.Period.EndTime.AsUtc;
-                    var localStart = TimeZoneInfo.ConvertTimeFromUtc(startUtc, _centralTimeZone);
-                    var localEnd = TimeZoneInfo.ConvertTimeFromUtc(endUtc, _centralTimeZone);
-
-                    events.Add(new CalendarEvent
-                    {
-                        Subject = vevent.Summary,
-                        Start = localStart.ToString("yyyy-MM-dd'T'HH:mm:ss"),
-                        End = localEnd.ToString("yyyy-MM-dd'T'HH:mm:ss"),
-                        IsAllDay = false
-                    });
-                }
-            }
+            response = await httpClient.GetAsync(_options.IcsUrl, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new UpstreamException(UpstreamName, null, "Could not reach the calendar feed.", ex);
         }
 
-        // finally, sort by day → all-day first → clock time
-        return events
-          .Select(e => new
-          {
-              E = e,
-              StartDt = DateTime.ParseExact(
-                e.Start,
-                e.IsAllDay
-                  ? "yyyy-MM-dd"
-                  : "yyyy-MM-dd'T'HH:mm:ss",
-                CultureInfo.InvariantCulture
-              )
-          })
-          .OrderBy(x => x.StartDt.Date)
-          .ThenBy(x => x.E.IsAllDay ? 0 : 1)
-          .ThenBy(x => x.StartDt.TimeOfDay)
-          .Select(x => x.E)
-          .ToList();
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("ICS feed request failed with {StatusCode}", (int)response.StatusCode);
+                throw new UpstreamException(
+                    UpstreamName,
+                    response.StatusCode,
+                    $"The calendar feed returned {(int)response.StatusCode}.");
+            }
+
+            return await response.Content.ReadAsStringAsync(cancellationToken);
+        }
+    }
+
+    private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
+    {
+        // .NET 8+ accepts IANA ids on every platform, so TimeZoneConverter is no longer
+        // needed; the Windows-style ids in older config still resolve too.
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            throw new InvalidOperationException(
+                $"Calendar:TimeZone '{timeZoneId}' is not a recognised time zone id.", ex);
+        }
     }
 }

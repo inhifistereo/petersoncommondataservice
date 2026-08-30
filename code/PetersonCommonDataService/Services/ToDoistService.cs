@@ -1,71 +1,106 @@
-using RestSharp;
+using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
+using PetersonCommonDataService.Configuration;
+using PetersonCommonDataService.Errors;
 using PetersonCommonDataService.Models;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
-namespace PetersonCommonDataService.Services
+namespace PetersonCommonDataService.Services;
+
+public interface IToDoistService
 {
-    public interface IToDoistService
+    Task<List<ToDoistTask>> GetTasksAsync(string projectId, CancellationToken cancellationToken = default);
+    Task<List<ToDoistSection>> GetSectionsAsync(string projectId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Thin client over the Todoist v1 REST API.
+/// </summary>
+/// <remarks>
+/// Uses a typed <see cref="HttpClient"/> rather than RestSharp so the transport can be
+/// faked in tests via a stub <see cref="HttpMessageHandler"/>.
+/// </remarks>
+public sealed class ToDoistService(HttpClient httpClient, IOptions<TodoistOptions> options, ILogger<ToDoistService> logger)
+    : IToDoistService
+{
+    private const string UpstreamName = "todoist";
+
+    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
+
+    private readonly TodoistOptions _options = options.Value;
+
+    public Task<List<ToDoistTask>> GetTasksAsync(string projectId, CancellationToken cancellationToken = default) =>
+        GetAllPagesAsync<ToDoistTask>("tasks", projectId, cancellationToken);
+
+    public Task<List<ToDoistSection>> GetSectionsAsync(string projectId, CancellationToken cancellationToken = default) =>
+        GetAllPagesAsync<ToDoistSection>("sections", projectId, cancellationToken);
+
+    /// <summary>
+    /// Fetches every page of a project-scoped collection.
+    /// </summary>
+    /// <remarks>
+    /// Both the project filter and the cursor loop matter: an unscoped request returns the
+    /// first 50 items across the whole account, which is how the DakBoard-labelled tasks
+    /// went missing entirely.
+    /// </remarks>
+    private async Task<List<T>> GetAllPagesAsync<T>(string resource, string projectId, CancellationToken cancellationToken)
     {
-        Task<List<ToDoistTask>> GetTasksAsync(string projectId);
-        Task<List<ToDoistSection>> GetSectionsAsync(string projectId);
-    }
+        var results = new List<T>();
+        string? cursor = null;
 
-    public class ToDoistService : IToDoistService
-    {
-        private readonly RestClient _restClient;
-        private readonly string _apiToken;
-
-        public ToDoistService(IConfiguration configuration)
+        do
         {
-            _apiToken = configuration["TODOIST-API-KEY"] ?? throw new Exception("TODOIST-API-KEY is not configured");
-            _restClient = new RestClient("https://api.todoist.com/api/v1");
-        }
-
-        public async Task<List<ToDoistTask>> GetTasksAsync(string projectId)
-        {
-            var allTasks = new List<ToDoistTask>();
-            string? cursor = null;
-
-            // Todoist pages this endpoint (50 per page by default), so keep
-            // following next_cursor until the last page comes back.
-            do
+            var url = $"{resource}?project_id={Uri.EscapeDataString(projectId)}";
+            if (!string.IsNullOrEmpty(cursor))
             {
-                var request = new RestRequest("tasks", Method.Get);
-                request.AddHeader("Authorization", $"Bearer {_apiToken}");
-                request.AddQueryParameter("project_id", projectId);
-                if (!string.IsNullOrEmpty(cursor))
-                {
-                    request.AddQueryParameter("cursor", cursor);
-                }
-
-                var response = await _restClient.ExecuteAsync(request);
-                if (!response.IsSuccessful)
-                {
-                    throw new Exception($"Todoist API error on tasks (project {projectId}): {(int)response.StatusCode} {response.StatusCode} — {response.Content}");
-                }
-
-                var page = JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistTask>>(response.Content ?? "") ?? new();
-                allTasks.AddRange(page.Results);
-                cursor = page.NextCursor;
-            } while (!string.IsNullOrEmpty(cursor));
-
-            return allTasks;
-        }
-
-        public async Task<List<ToDoistSection>> GetSectionsAsync(string projectId)
-        {
-            var request = new RestRequest($"sections?project_id={projectId}", Method.Get);
-            request.AddHeader("Authorization", $"Bearer {_apiToken}");
-
-            var response = await _restClient.ExecuteAsync(request);
-            if (!response.IsSuccessful)
-            {
-                throw new Exception($"Todoist API error on sections (project {projectId}): {(int)response.StatusCode} {response.StatusCode} — {response.Content}");
+                url += $"&cursor={Uri.EscapeDataString(cursor)}";
             }
 
-            return (JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistSection>>(response.Content ?? "") ?? new()).Results;
+            var page = await GetPageAsync<T>(url, projectId, cancellationToken);
+            results.AddRange(page.Results);
+            cursor = page.NextCursor;
+        } while (!string.IsNullOrEmpty(cursor));
+
+        return results;
+    }
+
+    private async Task<ToDoistPagedResponse<T>> GetPageAsync<T>(string url, string projectId, CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.GetAsync(url, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new UpstreamException(UpstreamName, null, "Could not reach the Todoist API.", ex);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                // Log the body for diagnosis; never surface it — it can echo the token.
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning(
+                    "Todoist request to {Resource} for project {ProjectId} failed with {StatusCode}: {Body}",
+                    url, projectId, (int)response.StatusCode, body);
+
+                throw new UpstreamException(
+                    UpstreamName,
+                    response.StatusCode,
+                    $"Todoist returned {(int)response.StatusCode} for '{url}'.");
+            }
+
+            try
+            {
+                return await response.Content.ReadFromJsonAsync<ToDoistPagedResponse<T>>(SerializerOptions, cancellationToken)
+                       ?? new ToDoistPagedResponse<T>();
+            }
+            catch (JsonException ex)
+            {
+                throw new UpstreamException(UpstreamName, response.StatusCode, "Todoist returned a response that could not be parsed.", ex);
+            }
         }
     }
 }
