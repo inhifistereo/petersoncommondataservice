@@ -10,7 +10,7 @@ namespace PetersonCommonDataService.Models
         [JsonPropertyName("content")]
         public string Content { get; set; } = string.Empty;
 
-        [JsonPropertyName("is_completed")]
+        [JsonPropertyName("checked")]
         public bool IsCompleted { get; set; }
 
         [JsonPropertyName("labels")]

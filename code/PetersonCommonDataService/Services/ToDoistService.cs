@@ -8,7 +8,7 @@ namespace PetersonCommonDataService.Services
 {
     public interface IToDoistService
     {
-        Task<List<ToDoistTask>> GetTasksAsync();
+        Task<List<ToDoistTask>> GetTasksAsync(string projectId);
         Task<List<ToDoistSection>> GetSectionsAsync(string projectId);
     }
 
@@ -23,18 +23,35 @@ namespace PetersonCommonDataService.Services
             _restClient = new RestClient("https://api.todoist.com/api/v1");
         }
 
-        public async Task<List<ToDoistTask>> GetTasksAsync()
+        public async Task<List<ToDoistTask>> GetTasksAsync(string projectId)
         {
-            var request = new RestRequest("tasks", Method.Get);
-            request.AddHeader("Authorization", $"Bearer {_apiToken}");
+            var allTasks = new List<ToDoistTask>();
+            string? cursor = null;
 
-            var response = await _restClient.ExecuteAsync(request);
-            if (!response.IsSuccessful)
+            // Todoist pages this endpoint (50 per page by default), so keep
+            // following next_cursor until the last page comes back.
+            do
             {
-                throw new Exception($"Todoist API error on tasks: {(int)response.StatusCode} {response.StatusCode} — {response.Content}");
-            }
+                var request = new RestRequest("tasks", Method.Get);
+                request.AddHeader("Authorization", $"Bearer {_apiToken}");
+                request.AddQueryParameter("project_id", projectId);
+                if (!string.IsNullOrEmpty(cursor))
+                {
+                    request.AddQueryParameter("cursor", cursor);
+                }
 
-            return (JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistTask>>(response.Content) ?? new()).Results;
+                var response = await _restClient.ExecuteAsync(request);
+                if (!response.IsSuccessful)
+                {
+                    throw new Exception($"Todoist API error on tasks (project {projectId}): {(int)response.StatusCode} {response.StatusCode} — {response.Content}");
+                }
+
+                var page = JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistTask>>(response.Content ?? "") ?? new();
+                allTasks.AddRange(page.Results);
+                cursor = page.NextCursor;
+            } while (!string.IsNullOrEmpty(cursor));
+
+            return allTasks;
         }
 
         public async Task<List<ToDoistSection>> GetSectionsAsync(string projectId)
@@ -48,7 +65,7 @@ namespace PetersonCommonDataService.Services
                 throw new Exception($"Todoist API error on sections (project {projectId}): {(int)response.StatusCode} {response.StatusCode} — {response.Content}");
             }
 
-            return (JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistSection>>(response.Content) ?? new()).Results;
+            return (JsonSerializer.Deserialize<ToDoistPagedResponse<ToDoistSection>>(response.Content ?? "") ?? new()).Results;
         }
     }
 }

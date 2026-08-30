@@ -60,3 +60,9 @@ variable "domain_name" {
   description = "Custom domain name for the application."
   type        = string
 }
+
+variable "image_tag" {
+  description = "Container image tag to deploy. CI passes the commit SHA so every deploy produces a new revision."
+  type        = string
+  default     = "latest"
+}

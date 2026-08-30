@@ -29,7 +29,9 @@ jobs:
         context: .
         file: infra/dockerfile
         push: true
-        tags: ${{ secrets.ACR_SERVER }}/petersoncommondataservice:latest
+        tags: |
+          ${{ secrets.ACR_SERVER }}/petersoncommondataservice:${{ github.sha }}
+          ${{ secrets.ACR_SERVER }}/petersoncommondataservice:latest
 
     # Terraform steps
     - name: Setup Terraform
@@ -57,7 +59,8 @@ jobs:
     - name: Terraform Plan
       run: |
         cd infra/terraform
-        terraform plan -var="ics_url=${{ secrets.ICS_URL }}" \
+        terraform plan -var="image_tag=${{ github.sha }}" \
+                       -var="ics_url=${{ secrets.ICS_URL }}" \
                        -var="todoist_api_key=${{ secrets.TODOIST_API_KEY }}" \
                        -var="todoist_project_id=${{ secrets.TODOIST_PROJECT_ID }}" \
                        -var="domain_name=${{ secrets.TF_VAR_DOMAIN_NAME }}" \

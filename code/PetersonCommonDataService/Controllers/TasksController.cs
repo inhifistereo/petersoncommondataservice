@@ -43,7 +43,7 @@ namespace PetersonCommonDataService.Controllers
             var projectId = _configuration["TODOIST-PROJECT-ID"] ?? throw new Exception("TODOIST-PROJECT-ID is not configured");
 
             var sections = await _toDoistService.GetSectionsAsync(projectId);
-            var tasks = await _toDoistService.GetTasksAsync();
+            var tasks = await _toDoistService.GetTasksAsync(projectId);
 
             _logger.LogInformation($"Retrieved {sections.Count} sections and {tasks.Count} tasks");
 

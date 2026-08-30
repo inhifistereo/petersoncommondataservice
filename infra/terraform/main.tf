@@ -92,7 +92,7 @@ resource "azurerm_container_app" "app" {
   template {
     container {
       name   = "petersoncommondataservice"
-      image  = "${var.container_registry_name}.azurecr.io/petersoncommondataservice:latest"
+      image  = "${var.container_registry_name}.azurecr.io/petersoncommondataservice:${var.image_tag}"
       cpu    = 0.5
       memory = "1Gi"
 
