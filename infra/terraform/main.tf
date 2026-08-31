@@ -90,11 +90,19 @@ resource "azurerm_container_app" "app" {
   }
 
   template {
+    # min_replicas is left at the platform default of 0 deliberately. The wall display
+    # polls every couple of minutes, well inside the ~5 minute idle window, so a replica
+    # stays alive on its own and the in-process cache survives between polls. Paying for
+    # an always-on replica would buy nothing the refresh cadence does not already provide.
+
     container {
-      name   = "petersoncommondataservice"
-      image  = "${var.container_registry_name}.azurecr.io/petersoncommondataservice:${var.image_tag}"
-      cpu    = 0.5
-      memory = "1Gi"
+      name  = "petersoncommondataservice"
+      image = "${var.container_registry_name}.azurecr.io/petersoncommondataservice:${var.image_tag}"
+
+      # This service is I/O-bound and idle almost all the time. Container Apps only
+      # permits specific CPU/memory pairs; 0.25 vCPU must pair with 0.5Gi.
+      cpu    = 0.25
+      memory = "0.5Gi"
 
       liveness_probe {
         transport = "HTTP"

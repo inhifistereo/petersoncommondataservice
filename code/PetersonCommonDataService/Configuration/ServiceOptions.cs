@@ -19,6 +19,25 @@ public sealed class CalendarOptions
     /// <summary>Default number of days returned by GET /calendar when ?days is absent.</summary>
     [Range(1, 30)]
     public int DefaultDays { get; set; } = 5;
+
+    /// <summary>
+    /// How long an expansion stays fresh. The published ICS is itself hours stale and the
+    /// download is the slowest upstream call, so a tighter window buys nothing.
+    /// </summary>
+    [Range(30, 3600)]
+    public int CacheSeconds { get; set; } = 360;
+
+    /// <summary>How long a successful expansion is retained to serve during an outage.</summary>
+    [Range(1, 168)]
+    public int LastGoodHours { get; set; } = 24;
+
+    /// <summary>Days before today included in the cached wide window.</summary>
+    [Range(0, 7)]
+    public int WindowLookbackDays { get; set; } = 1;
+
+    /// <summary>Days after today included in the cached wide window. Requests slice from this.</summary>
+    [Range(7, 400)]
+    public int WindowLookaheadDays { get; set; } = 35;
 }
 
 /// <summary>
@@ -39,6 +58,17 @@ public sealed class TodoistOptions
 
     /// <summary>Label a task must carry to appear on the wall display.</summary>
     public string DisplayLabel { get; set; } = "DakBoard";
+
+    /// <summary>
+    /// How long a task list stays fresh. Deliberately below the display's refresh interval:
+    /// a checked-off chore should leave the wall promptly, and the call volume is trivial.
+    /// </summary>
+    [Range(15, 3600)]
+    public int CacheSeconds { get; set; } = 90;
+
+    /// <summary>How long a successful fetch is retained to serve during an outage.</summary>
+    [Range(1, 168)]
+    public int LastGoodHours { get; set; } = 12;
 }
 
 /// <summary>Browser origins permitted to call the API.</summary>

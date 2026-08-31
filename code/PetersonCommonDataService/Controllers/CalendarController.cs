@@ -1,5 +1,7 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using PetersonCommonDataService.Caching;
 using PetersonCommonDataService.Configuration;
 using PetersonCommonDataService.Models;
 using PetersonCommonDataService.Services;
@@ -45,7 +47,7 @@ public sealed class CalendarController(
             TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), timeZone).DateTime);
 
         DateOnly startDate;
-        DateOnly endDateExclusive;
+        DateOnly endDateInclusive;
 
         if (from is not null && to is not null)
         {
@@ -66,36 +68,43 @@ public sealed class CalendarController(
             }
 
             startDate = from.Value;
-            endDateExclusive = to.Value.AddDays(1);
+            endDateInclusive = to.Value;
         }
         else
         {
             var requestedDays = Math.Clamp(days ?? _options.DefaultDays, 1, MaxDays);
             startDate = today;
-            endDateExclusive = today.AddDays(requestedDays);
+            endDateInclusive = today.AddDays(requestedDays - 1);
         }
 
-        var windowStart = ToOffset(startDate, timeZone);
-        var windowEnd = ToOffset(endDateExclusive, timeZone);
+        var cached = await calendarService.GetAllEventsAsync(cancellationToken);
 
-        logger.LogInformation("Serving calendar window {WindowStart} to {WindowEnd}", windowStart, windowEnd);
+        // The cached expansion covers a wide window; take only the requested slice.
+        // Comparing the date strings is safe because both are yyyy-MM-dd, and it keeps
+        // the filter in the display's own local-date terms.
+        var startKey = startDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var endKey = endDateInclusive.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        var events = await calendarService.GetEventsAsync(windowStart, windowEnd, cancellationToken);
+        var events = cached.Value
+            .Where(e => string.CompareOrdinal(e.EndDate, startKey) >= 0
+                     && string.CompareOrdinal(e.StartDate, endKey) <= 0)
+            .ToList();
 
-        return Ok(new ApiResponse<IReadOnlyList<CalendarEvent>>(
-            events,
-            new ResponseMeta
-            {
-                Source = "ics",
-                FetchedAt = timeProvider.GetUtcNow(),
-                TtlSeconds = 360,
-            }));
-    }
+        logger.LogInformation(
+            "Serving {EventCount} of {CachedCount} cached events for {StartKey}..{EndKey} (stale={Stale})",
+            events.Count, cached.Value.Count, startKey, endKey, cached.Stale);
 
-    /// <summary>Midnight on the given local date, carrying that date's real UTC offset.</summary>
-    private static DateTimeOffset ToOffset(DateOnly date, TimeZoneInfo timeZone)
-    {
-        var local = date.ToDateTime(TimeOnly.MinValue);
-        return new DateTimeOffset(local, timeZone.GetUtcOffset(local));
+        var meta = new ResponseMeta
+        {
+            Source = "ics",
+            FetchedAt = cached.FetchedAt,
+            Stale = cached.Stale,
+            StaleReason = cached.StaleReason,
+            TtlSeconds = cached.TtlSeconds,
+        };
+
+        Response.ApplyFreshness(meta, timeProvider);
+
+        return Ok(new ApiResponse<IReadOnlyList<CalendarEvent>>(events, meta));
     }
 }

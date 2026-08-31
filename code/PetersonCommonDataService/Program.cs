@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
+using PetersonCommonDataService.Caching;
 using PetersonCommonDataService.Configuration;
 using PetersonCommonDataService.Errors;
 using PetersonCommonDataService.Services;
@@ -92,6 +93,12 @@ builder.Services.AddControllers()
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IcsEventExpander>();
 
+// Caching. The cache is in-process, so it dies with the replica — acceptable because the
+// display's frequent polling keeps a replica alive, and a cold start simply refetches.
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ICachedSource, CachedSource>();
+builder.Services.AddScoped<DisplayTaskService>();
+
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -124,6 +131,10 @@ app.UseExceptionHandler();
 
 app.UseRouting();
 app.UseCors("DisplayOrigins");
+
+// After CORS so preflights are answered without buffering, and before the endpoints
+// whose responses it validates.
+app.UseMiddleware<ConditionalGetMiddleware>();
 
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {

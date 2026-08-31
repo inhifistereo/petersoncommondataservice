@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using PetersonCommonDataService.Caching;
 using PetersonCommonDataService.Configuration;
 using PetersonCommonDataService.Models;
 using PetersonCommonDataService.Services;
@@ -9,10 +10,10 @@ namespace PetersonCommonDataService.Controllers;
 [ApiController]
 [Route("tasks")]
 public sealed class TasksController(
+    DisplayTaskService displayTaskService,
     IToDoistService toDoistService,
     IOptions<TodoistOptions> options,
-    TimeProvider timeProvider,
-    ILogger<TasksController> logger) : ControllerBase
+    TimeProvider timeProvider) : ControllerBase
 {
     private readonly TodoistOptions _options = options.Value;
 
@@ -28,39 +29,28 @@ public sealed class TasksController(
     [HttpGet]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<DakBoardTask>>>> GetRygTasks(CancellationToken cancellationToken)
     {
-        var projectId = _options.ProjectId;
+        var cached = await displayTaskService.GetDisplayTasksAsync(cancellationToken);
 
-        var sections = await toDoistService.GetSectionsAsync(projectId, cancellationToken);
-        var tasks = await toDoistService.GetTasksAsync(projectId, cancellationToken);
+        var meta = new ResponseMeta
+        {
+            Source = "todoist",
+            FetchedAt = cached.FetchedAt,
+            Stale = cached.Stale,
+            StaleReason = cached.StaleReason,
+            TtlSeconds = cached.TtlSeconds,
+        };
 
-        logger.LogInformation(
-            "Retrieved {SectionCount} sections and {TaskCount} tasks for project {ProjectId}",
-            sections.Count, tasks.Count, projectId);
+        Response.ApplyFreshness(meta, timeProvider);
 
-        var displayTasks = tasks
-            .Where(task => !task.IsCompleted && task.Labels.Contains(_options.DisplayLabel))
-            .Select(task => ToDisplayTask(task, sections))
-            .OrderBy(task => ColorRank(task.Color))
-            .ToList();
-
-        logger.LogInformation("Filtered to {DisplayTaskCount} display tasks", displayTasks.Count);
-
-        return Ok(new ApiResponse<IReadOnlyList<DakBoardTask>>(
-            displayTasks,
-            new ResponseMeta
-            {
-                Source = "todoist",
-                FetchedAt = timeProvider.GetUtcNow(),
-                TtlSeconds = 90,
-            }));
+        return Ok(new ApiResponse<IReadOnlyList<DakBoardTask>>(cached.Value, meta));
     }
 
     /// <summary>
     /// Every task in the configured project, unfiltered — the debugging view.
     /// </summary>
     /// <remarks>
-    /// Development only. It returns unfiltered task data (labels, section ids, completion
-    /// state) that the display has no use for, so it is not exposed in Production.
+    /// Development only, and deliberately uncached so it always shows current upstream
+    /// state. It returns data the display has no use for, so it is not exposed in Production.
     /// </remarks>
     [HttpGet("getall")]
     public async Task<ActionResult<IReadOnlyList<ToDoistTask>>> GetAllTasks(
@@ -75,30 +65,4 @@ public sealed class TasksController(
         var tasks = await toDoistService.GetTasksAsync(_options.ProjectId, cancellationToken);
         return Ok(tasks);
     }
-
-    private DakBoardTask ToDisplayTask(ToDoistTask task, IReadOnlyList<ToDoistSection> sections)
-    {
-        var section = sections.FirstOrDefault(s => s.Id == task.SectionId);
-        if (section is null)
-        {
-            logger.LogWarning(
-                "Section {SectionId} not found for task {TaskId}; falling back to default colour",
-                task.SectionId, task.Id);
-        }
-
-        return new DakBoardTask
-        {
-            Id = task.Id,
-            Content = task.Content,
-            Color = section?.Name.ToUpperInvariant() ?? "BLACK",
-        };
-    }
-
-    private static int ColorRank(string color) => color switch
-    {
-        "RED" => 0,
-        "YELLOW" => 1,
-        "GREEN" => 2,
-        _ => 3,
-    };
 }

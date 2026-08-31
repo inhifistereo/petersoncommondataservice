@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using PetersonCommonDataService.Caching;
 using PetersonCommonDataService.Configuration;
 using PetersonCommonDataService.Errors;
 using PetersonCommonDataService.Models;
@@ -15,6 +16,8 @@ namespace PetersonCommonDataService.Services;
 public sealed class CalendarService(
     HttpClient httpClient,
     IcsEventExpander expander,
+    ICachedSource cache,
+    TimeProvider timeProvider,
     IOptions<CalendarOptions> options,
     ILogger<CalendarService> logger)
 {
@@ -25,11 +28,27 @@ public sealed class CalendarService(
     /// <summary>Resolved once so an invalid configured zone fails loudly rather than silently defaulting.</summary>
     public TimeZoneInfo TimeZone { get; } = ResolveTimeZone(options.Value.TimeZone);
 
-    public async Task<IReadOnlyList<CalendarEvent>> GetEventsAsync(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Every occurrence in a deliberately wide window around today.
+    /// </summary>
+    /// <remarks>
+    /// One wide expansion is cached and each request slices the portion it asked for, so
+    /// varying <c>?days</c> cannot fan the cache out into an entry per value.
+    /// </remarks>
+    public Task<CachedResult<IReadOnlyList<CalendarEvent>>> GetAllEventsAsync(CancellationToken cancellationToken = default) =>
+        cache.GetAsync(
+            "calendar",
+            TimeSpan.FromSeconds(_options.CacheSeconds),
+            TimeSpan.FromHours(_options.LastGoodHours),
+            ExpandWideWindowAsync,
+            cancellationToken);
+
+    private async Task<IReadOnlyList<CalendarEvent>> ExpandWideWindowAsync(CancellationToken cancellationToken)
     {
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), TimeZone).DateTime);
+        var windowStart = ToOffset(today.AddDays(-_options.WindowLookbackDays), TimeZone);
+        var windowEnd = ToOffset(today.AddDays(_options.WindowLookaheadDays), TimeZone);
+
         var ics = await DownloadAsync(cancellationToken);
 
         try
@@ -44,6 +63,13 @@ public sealed class CalendarService(
         {
             throw new UpstreamException(UpstreamName, null, "The calendar feed could not be parsed.", ex);
         }
+    }
+
+    /// <summary>Midnight on the given local date, carrying that date's real UTC offset.</summary>
+    public static DateTimeOffset ToOffset(DateOnly date, TimeZoneInfo timeZone)
+    {
+        var local = date.ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(local, timeZone.GetUtcOffset(local));
     }
 
     private async Task<string> DownloadAsync(CancellationToken cancellationToken)
