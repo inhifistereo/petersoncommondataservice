@@ -79,6 +79,25 @@ resource "azurerm_container_app" "app" {
     value = var.api_keys
   }
 
+  # Weather is optional. These blocks are omitted entirely when no coordinates are
+  # supplied, because Azure rejects a Container App secret with an empty value - and the
+  # app already degrades to a 503 on /weather when the location is unset.
+  dynamic "secret" {
+    for_each = var.weather_latitude != "" && var.weather_longitude != "" ? [1] : []
+    content {
+      name  = "weather-latitude-secret"
+      value = var.weather_latitude
+    }
+  }
+
+  dynamic "secret" {
+    for_each = var.weather_latitude != "" && var.weather_longitude != "" ? [1] : []
+    content {
+      name  = "weather-longitude-secret"
+      value = var.weather_longitude
+    }
+  }
+
   ingress {
     external_enabled = true
     target_port      = 8080
@@ -149,6 +168,22 @@ resource "azurerm_container_app" "app" {
       env {
         name        = "Api__Keys"
         secret_name = "api-keys-secret"
+      }
+
+      dynamic "env" {
+        for_each = var.weather_latitude != "" && var.weather_longitude != "" ? [1] : []
+        content {
+          name        = "Weather__Latitude"
+          secret_name = "weather-latitude-secret"
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.weather_latitude != "" && var.weather_longitude != "" ? [1] : []
+        content {
+          name        = "Weather__Longitude"
+          secret_name = "weather-longitude-secret"
+        }
       }
 
       env {

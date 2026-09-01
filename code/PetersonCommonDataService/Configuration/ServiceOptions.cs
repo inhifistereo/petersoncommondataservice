@@ -100,3 +100,51 @@ public sealed class ApiOptions
 
     public bool HasKeys => ParsedKeys.Count > 0;
 }
+
+/// <summary>
+/// Weather settings. Coordinates arrive from the deployment as secrets rather than living
+/// in the repo, so a home location is not committed to source control.
+/// </summary>
+public sealed class WeatherOptions
+{
+    public const string SectionName = "Weather";
+
+    [Range(-90, 90)]
+    public double? Latitude { get; set; }
+
+    [Range(-180, 180)]
+    public double? Longitude { get; set; }
+
+    /// <summary>
+    /// NWS requires a User-Agent identifying the caller and rejects requests without one.
+    /// </summary>
+    public string UserAgent { get; set; } = "PetersonCommonDataService (github.com/inhifistereo/petersoncommondataservice)";
+
+    /// <summary>Days of daily forecast to return.</summary>
+    [Range(1, 7)]
+    public int ForecastDays { get; set; } = 5;
+
+    /// <summary>Hours of hourly forecast to return.</summary>
+    [Range(1, 156)]
+    public int ForecastHours { get; set; } = 12;
+
+    /// <summary>Forecast freshness. NWS updates roughly hourly.</summary>
+    [Range(60, 3600)]
+    public int CacheSeconds { get; set; } = 900;
+
+    /// <summary>
+    /// Alerts are cached far more briefly than the forecast. A severe-weather warning is
+    /// the highest-value thing on the display and must not sit behind a 15 minute window.
+    /// </summary>
+    [Range(30, 900)]
+    public int AlertCacheSeconds { get; set; } = 300;
+
+    /// <summary>
+    /// How long a forecast is retained to serve during an outage. Deliberately short:
+    /// weather older than this is worse than showing nothing.
+    /// </summary>
+    [Range(1, 24)]
+    public int LastGoodHours { get; set; } = 6;
+
+    public bool IsConfigured => Latitude is not null && Longitude is not null;
+}

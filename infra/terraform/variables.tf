@@ -72,3 +72,17 @@ variable "api_keys" {
   type        = string
   sensitive   = true
 }
+
+variable "weather_latitude" {
+  description = "Latitude for the NWS forecast grid. Kept as a secret so a home location is not committed to the repo."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "weather_longitude" {
+  description = "Longitude for the NWS forecast grid. Kept as a secret so a home location is not committed to the repo."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

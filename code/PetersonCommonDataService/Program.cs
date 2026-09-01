@@ -7,6 +7,7 @@ using PetersonCommonDataService.Configuration;
 using PetersonCommonDataService.Errors;
 using PetersonCommonDataService.Security;
 using PetersonCommonDataService.Services;
+using PetersonCommonDataService.Services.Weather;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +63,13 @@ builder.Services.AddOptions<TodoistOptions>()
 
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
 
+// Weather is optional: an unset location leaves GET /weather returning 503 rather than
+// blocking startup, so adding the feature cannot take the whole service down.
+builder.Services.AddOptions<WeatherOptions>()
+    .Bind(builder.Configuration.GetSection(WeatherOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 // Fail closed: outside Development the app refuses to start without a key rather than
 // quietly serving the household's calendar and tasks to anyone who finds the hostname.
 builder.Services.AddOptions<ApiOptions>()
@@ -88,6 +96,17 @@ builder.Services.AddHttpClient<IToDoistService, ToDoistService>((serviceProvider
     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
 });
 
+builder.Services.AddHttpClient<IWeatherProvider, NwsWeatherProvider>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<WeatherOptions>>().Value;
+    client.BaseAddress = new Uri("https://api.weather.gov/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+
+    // NWS rejects requests without a User-Agent identifying the caller.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(options.UserAgent);
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/geo+json");
+});
+
 // ---------------------------------------------------------------------------
 // MVC + serialisation. One JSON configuration for every endpoint, so controllers
 // return typed objects and never hand-serialise.
@@ -108,6 +127,7 @@ builder.Services.AddSingleton<IcsEventExpander>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICachedSource, CachedSource>();
 builder.Services.AddScoped<DisplayTaskService>();
+builder.Services.AddScoped<WeatherService>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

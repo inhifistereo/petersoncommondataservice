@@ -1,3 +1,5 @@
+weather_latitude = "{your-latitude-here}"
+weather_longitude = "{your-longitude-here}"
 api_keys = "{comma-separated-api-keys-here}"
 domain_name = "{your-domain-here}"
 ics_url = "{your-ics-url-here}"
