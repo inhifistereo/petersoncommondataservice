@@ -51,12 +51,17 @@ resource "azurerm_log_analytics_workspace" "log_analytics" {
   tags = local.tags
 }
 
+# Deliberately untagged, unlike every other resource here. Any update to a container app
+# environment re-sends a full CreateOrUpdate, and its LogAnalyticsConfiguration has to
+# carry the workspace shared key - which the Azure API returns as null on every read. So
+# the provider faithfully sends that null back and Azure rejects the whole call with
+# "LogAnalyticsConfiguration is invalid". Adding four tags was enough to trigger it and
+# leave an apply half-finished. Four tags are not worth an unrunnable pipeline.
 resource "azurerm_container_app_environment" "env" {
   name                       = var.container_apps_environment_name
   location                   = var.location
   resource_group_name        = azurerm_resource_group.rg.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
-  tags                       = local.tags
 }
 
 # More secure: Disable ACR admin credentials
