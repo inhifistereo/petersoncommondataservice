@@ -78,3 +78,25 @@ public sealed class CorsOptions
 
     public string[] AllowedOrigins { get; set; } = [];
 }
+
+/// <summary>API access control.</summary>
+public sealed class ApiOptions
+{
+    public const string SectionName = "Api";
+
+    /// <summary>
+    /// Accepted API keys, comma-separated. More than one is allowed so a key can be
+    /// rotated without a window where the display is locked out: add the new key, move
+    /// the display over, then drop the old one.
+    /// </summary>
+    /// <remarks>
+    /// A single delimited string rather than an array because this arrives as one
+    /// Container App secret injected into one environment variable.
+    /// </remarks>
+    public string Keys { get; set; } = string.Empty;
+
+    public IReadOnlyList<string> ParsedKeys =>
+        Keys.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public bool HasKeys => ParsedKeys.Count > 0;
+}

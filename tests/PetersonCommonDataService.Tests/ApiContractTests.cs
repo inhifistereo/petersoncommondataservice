@@ -16,9 +16,22 @@ namespace PetersonCommonDataService.Tests;
 /// </summary>
 public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
 {
+    private const string TestApiKey = "contract-test-key";
+
     private readonly Factory _factory;
 
     public ApiContractTests(Factory factory) => _factory = factory;
+
+    /// <summary>
+    /// A client that always presents a valid key, so these tests exercise the wire contract
+    /// rather than re-testing access control. ApiKeyTests covers that.
+    /// </summary>
+    private HttpClient CreateAuthenticatedClient()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", TestApiKey);
+        return client;
+    }
 
     public sealed class StubToDoistService : IToDoistService
     {
@@ -49,6 +62,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
                 ["ICS-URL"] = "http://localhost/unused.ics",
                 ["TODOIST-API-KEY"] = "test-key",
                 ["TODOIST-PROJECT-ID"] = "test-project",
+                ["Api:Keys"] = TestApiKey,
             }));
 
             builder.ConfigureServices(services =>
@@ -64,7 +78,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [Fact]
     public async Task Tasks_ReturnsEnvelopeWithDataAndMeta()
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/tasks");
         response.EnsureSuccessStatusCode();
@@ -83,7 +97,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [Fact]
     public async Task Meta_CarriesNoPerRequestField_SoTheBodyIsStableBetweenPolls()
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         var first = await client.GetStringAsync("/tasks");
         var second = await client.GetStringAsync("/tasks");
@@ -96,7 +110,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [Fact]
     public async Task Response_CarriesETagCacheControlAndAge()
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/tasks");
 
@@ -109,7 +123,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [Fact]
     public async Task MatchingIfNoneMatch_Returns304WithNoBody()
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         var first = await client.GetAsync("/tasks");
         var etag = first.Headers.ETag!.ToString();
@@ -127,7 +141,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [Fact]
     public async Task NonMatchingIfNoneMatch_ReturnsFullBody()
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/tasks");
         request.Headers.TryAddWithoutValidation("If-None-Match", "W/\"something-else\"");
@@ -140,7 +154,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [Fact]
     public async Task HealthLive_AnswersWithoutTouchingUpstreams()
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/health/live");
 
@@ -150,7 +164,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [Fact]
     public async Task GetAll_IsNotExposedOutsideDevelopment()
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         var response = await client.GetAsync("/tasks/getall");
 
@@ -162,7 +176,7 @@ public sealed class ApiContractTests : IClassFixture<ApiContractTests.Factory>
     [InlineData("/calendar?to=2026-09-01")]
     public async Task Calendar_RejectsAHalfSpecifiedRange(string url)
     {
-        using var client = _factory.CreateClient();
+        using var client = CreateAuthenticatedClient();
 
         var response = await client.GetAsync(url);
 

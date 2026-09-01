@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using PetersonCommonDataService.Caching;
 using PetersonCommonDataService.Configuration;
 using PetersonCommonDataService.Errors;
+using PetersonCommonDataService.Security;
 using PetersonCommonDataService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -60,6 +61,15 @@ builder.Services.AddOptions<TodoistOptions>()
     .ValidateOnStart();
 
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
+
+// Fail closed: outside Development the app refuses to start without a key rather than
+// quietly serving the household's calendar and tasks to anyone who finds the hostname.
+builder.Services.AddOptions<ApiOptions>()
+    .Bind(builder.Configuration.GetSection(ApiOptions.SectionName))
+    .Validate(
+        apiOptions => builder.Environment.IsDevelopment() || apiOptions.HasKeys,
+        $"{ApiOptions.SectionName}:Keys must be configured outside Development.")
+    .ValidateOnStart();
 
 // ---------------------------------------------------------------------------
 // HTTP clients — every one gets an explicit timeout. Without it the default is
@@ -132,8 +142,9 @@ app.UseExceptionHandler();
 app.UseRouting();
 app.UseCors("DisplayOrigins");
 
-// After CORS so preflights are answered without buffering, and before the endpoints
-// whose responses it validates.
+// Order matters: CORS first so preflights are handled before the key check sees them,
+// then the key check, then conditional GET on whatever survives.
+app.UseMiddleware<ApiKeyMiddleware>();
 app.UseMiddleware<ConditionalGetMiddleware>();
 
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions

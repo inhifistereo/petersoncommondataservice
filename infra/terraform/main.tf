@@ -74,6 +74,11 @@ resource "azurerm_container_app" "app" {
     value = var.todoist_project_id
   }
 
+  secret {
+    name  = "api-keys-secret"
+    value = var.api_keys
+  }
+
   ingress {
     external_enabled = true
     target_port      = 8080
@@ -139,6 +144,11 @@ resource "azurerm_container_app" "app" {
       env {
         name        = "TODOIST-PROJECT-ID"
         secret_name = "todoist-project-id-secret"
+      }
+
+      env {
+        name        = "Api__Keys"
+        secret_name = "api-keys-secret"
       }
 
       env {
