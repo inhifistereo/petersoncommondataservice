@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <!--
+      xunit.v3 runs on Microsoft.Testing.Platform. On the .NET 10 SDK "dotnet test" still
+      routes through the retired VSTest bridge and fails, and neither the documented
+      dotnet.config opt-in nor this property changes that today. Run the suite by
+      executing this project directly instead, via "dotnet run" with the project flag.
+    -->
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../code/PetersonCommonDataService/PetersonCommonDataService.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

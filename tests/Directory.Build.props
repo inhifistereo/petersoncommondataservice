@@ -1,0 +1,16 @@
+<Project>
+
+  <!-- Inherit the repo-wide settings, then relax the rules that fight test conventions. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove($(MSBuildThisFileName)$(MSBuildThisFileExtension), $(MSBuildThisFileDirectory)..))" />
+
+  <PropertyGroup>
+    <!--
+      CA1707  - Method_Name_Describes_Behaviour is the standard xUnit convention and is
+                more readable than the alternative in a test suite.
+      xUnit1051 - Threading a CancellationToken through every assertion adds noise without
+                  value here; these tests are fast and non-interactive.
+    -->
+    <NoWarn>$(NoWarn);CA1707;xUnit1051</NoWarn>
+  </PropertyGroup>
+
+</Project>
