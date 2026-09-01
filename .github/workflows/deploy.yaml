@@ -61,6 +61,8 @@ jobs:
         cd infra/terraform
         terraform plan -var="image_tag=${{ github.sha }}" \
                        -var="api_keys=${{ secrets.API_KEYS }}" \
+                       -var="weather_latitude=${{ secrets.WEATHER_LATITUDE }}" \
+                       -var="weather_longitude=${{ secrets.WEATHER_LONGITUDE }}" \
                        -var="ics_url=${{ secrets.ICS_URL }}" \
                        -var="todoist_api_key=${{ secrets.TODOIST_API_KEY }}" \
                        -var="todoist_project_id=${{ secrets.TODOIST_PROJECT_ID }}" \
