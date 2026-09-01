@@ -1,7 +1,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
+
+# Directory.Build.props carries TargetFramework and the analysis settings, and global.json
+# pins the SDK, so both must be present before restore. Copying them alongside the csproj
+# keeps the restore layer cached independently of source changes.
+COPY ["Directory.Build.props", "global.json", "./"]
 COPY ["code/PetersonCommonDataService/PetersonCommonDataService.csproj", "code/PetersonCommonDataService/"]
 RUN dotnet restore "code/PetersonCommonDataService/PetersonCommonDataService.csproj"
+
 COPY . .
 WORKDIR "/src/code/PetersonCommonDataService"
 RUN dotnet publish "PetersonCommonDataService.csproj" -c Release -o /app/publish /p:UseAppHost=false

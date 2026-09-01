@@ -1,0 +1,15 @@
+# Local build output. Copying host-generated obj/ into the image can break the
+# container restore, since project.assets.json records absolute host paths.
+**/bin/
+**/obj/
+
+# Secrets and local-only config; never belongs in a build context.
+**/.env
+
+.git/
+.github/
+.vscode/
+tests/
+infra/terraform/.terraform/
+docs/
+*.md
