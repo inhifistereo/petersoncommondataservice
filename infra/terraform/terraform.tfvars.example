@@ -1,3 +1,4 @@
+api_keys = "{comma-separated-api-keys-here}"
 domain_name = "{your-domain-here}"
 ics_url = "{your-ics-url-here}"
 subscription_id = "{your-azure-subscription-id-here}"

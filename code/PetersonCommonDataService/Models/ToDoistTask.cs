@@ -18,8 +18,6 @@ namespace PetersonCommonDataService.Models
 
         [JsonPropertyName("section_id")]
         public string SectionId { get; set; } = string.Empty;
-
-        public string Color { get; set; } = "black"; // Default color
     }
 
     public class Due

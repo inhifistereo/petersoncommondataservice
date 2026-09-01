@@ -66,3 +66,9 @@ variable "image_tag" {
   type        = string
   default     = "latest"
 }
+
+variable "api_keys" {
+  description = "Comma-separated API keys accepted by the service. Required: the app refuses to start without one outside Development, so a missing value fails the plan rather than the running container."
+  type        = string
+  sensitive   = true
+}

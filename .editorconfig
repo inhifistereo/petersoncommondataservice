@@ -1,0 +1,47 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{json,yml,yaml,tf,tfvars}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Namespaces / usings
+csharp_style_namespace_declarations = file_scoped:suggestion
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# var
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# Modern C#
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_prefer_braces = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_throw_expression = true:suggestion
+
+# Nullability discipline — these are the ones that actually catch bugs here
+dotnet_diagnostic.CS8618.severity = error
+dotnet_diagnostic.CS8602.severity = error
+dotnet_diagnostic.CS8604.severity = error
+
+# Logging: enforce structured templates, not interpolated strings
+dotnet_diagnostic.CA2254.severity = warning
+
+# High-performance logging rules. LoggerMessage delegates and cached log predicates are
+# the right call in a hot path; this service logs a handful of lines per request against
+# network I/O, so the ceremony would cost far more readability than it buys.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
