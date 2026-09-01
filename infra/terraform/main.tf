@@ -7,10 +7,10 @@ terraform {
     }
   }
   backend "azurerm" {
-    resource_group_name   = "terraform-rg"
-    storage_account_name  = "dptfstate1983"
-    container_name        = "tfstate"
-    key                   = "terraform.tfstate"
+    resource_group_name  = "terraform-rg"
+    storage_account_name = "dptfstate1983"
+    container_name       = "tfstate"
+    key                  = "terraform.tfstate"
   }
 }
 
@@ -20,9 +20,19 @@ provider "azurerm" {
   tenant_id       = var.tenant_id
 }
 
+locals {
+  tags = {
+    application = "petersoncommondataservice"
+    environment = "production"
+    managed-by  = "terraform"
+    repository  = "inhifistereo/petersoncommondataservice"
+  }
+}
+
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
+  tags     = local.tags
 }
 
 resource "azurerm_log_analytics_workspace" "log_analytics" {
@@ -31,6 +41,14 @@ resource "azurerm_log_analytics_workspace" "log_analytics" {
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
+
+  # A runaway log loop on a pay-per-GB workspace is the one way this deployment can get
+  # expensive. One replica of an idle API writes a few MB a day, so this cap is far above
+  # normal traffic and only trips on a genuine fault. Ingestion stops for the rest of the
+  # UTC day when it does, so raise it rather than debug blind if logs ever go missing.
+  daily_quota_gb = var.log_analytics_daily_quota_gb
+
+  tags = local.tags
 }
 
 resource "azurerm_container_app_environment" "env" {
@@ -38,6 +56,7 @@ resource "azurerm_container_app_environment" "env" {
   location                   = var.location
   resource_group_name        = azurerm_resource_group.rg.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
+  tags                       = local.tags
 }
 
 # More secure: Disable ACR admin credentials
@@ -47,6 +66,7 @@ resource "azurerm_container_registry" "acr" {
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = "Basic"
   admin_enabled       = false
+  tags                = local.tags
 }
 
 resource "azurerm_container_app" "app" {
@@ -54,6 +74,7 @@ resource "azurerm_container_app" "app" {
   resource_group_name          = azurerm_resource_group.rg.name
   container_app_environment_id = azurerm_container_app_environment.env.id
   revision_mode                = "Single"
+  tags                         = local.tags
 
   identity {
     type = "SystemAssigned"
@@ -128,10 +149,16 @@ resource "azurerm_container_app" "app" {
       cpu    = 0.25
       memory = "0.5Gi"
 
+      # Both probes point at /health/live, which runs zero checks and only proves the
+      # process answers. Pointing them at anything that touches an upstream would let a
+      # Todoist outage kill a healthy container and destroy the cache that exists
+      # precisely to survive that outage. Upstream health is reported by /health/ready
+      # and by the "stale" flag in each response envelope, neither of which is wired to
+      # a probe.
       liveness_probe {
         transport = "HTTP"
         port      = 8080
-        path      = "/health"
+        path      = "/health/live"
 
         initial_delay           = 30
         interval_seconds        = 10
@@ -142,7 +169,7 @@ resource "azurerm_container_app" "app" {
       startup_probe {
         transport = "HTTP"
         port      = 8080
-        path      = "/health"
+        path      = "/health/live"
 
         initial_delay           = 15
         interval_seconds        = 5
@@ -199,6 +226,41 @@ resource "azurerm_container_app" "app" {
   }
 }
 
+# The container app pulls its image as its own system-assigned identity
+# (registry { identity = "System" } above), which only works while that identity holds
+# AcrPull on the registry. That grant was made by hand and lived nowhere in this config,
+# so nothing detected its removal and a rebuild from scratch produced an app that could
+# never pull. Declaring it here makes the dependency visible and drift detectable.
+#
+# Two caveats worth knowing before relying on this for a from-scratch rebuild:
+#   - The CI service principal is Contributor, which can read role assignments but cannot
+#     create them. Importing works; creating one would need User Access Administrator.
+#   - The grant depends on an identity that only exists once the app is created, but the
+#     app needs the grant to pull its first image. Breaking that cycle means moving to a
+#     user-assigned identity created ahead of the app.
+resource "azurerm_role_assignment" "acr_pull" {
+  scope                = azurerm_container_registry.acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_container_app.app.identity[0].principal_id
+}
+
+# Transitional: adopts the existing hand-made assignment instead of trying to create a
+# duplicate, which Azure rejects with RoleAssignmentExists. Leaving this in place is
+# harmless on later runs - Terraform skips an import whose target is already in state -
+# but delete it once the apply on main has succeeded, because an import block pointed at
+# a resource that does not exist fails the plan, which is exactly the from-scratch case
+# this resource was added to support.
+import {
+  to = azurerm_role_assignment.acr_pull
+  id = "${local.acr_id}/providers/Microsoft.Authorization/roleAssignments/${var.acr_pull_role_assignment_id}"
+}
+
+locals {
+  # Built from variables rather than referenced off azurerm_container_registry.acr.id
+  # because an import block's id has to resolve at plan time, before any resource is read.
+  acr_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerRegistry/registries/${var.container_registry_name}"
+}
+
 resource "azurerm_container_app_custom_domain" "custom_domain" {
   container_app_id = azurerm_container_app.app.id
   name             = var.domain_name
@@ -208,7 +270,12 @@ resource "azurerm_container_app_custom_domain" "custom_domain" {
   }
 }
 
-# Output the Container App URL
+# The app's stable hostname. Deliberately not latest_revision_fqdn, which carries the
+# revision name and therefore changes on every single deploy.
 output "container_app_url" {
-  value = azurerm_container_app.app.latest_revision_fqdn
+  value = "https://${azurerm_container_app.app.ingress[0].fqdn}"
+}
+
+output "custom_domain_url" {
+  value = "https://${var.domain_name}"
 }
