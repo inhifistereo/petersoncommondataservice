@@ -6,6 +6,15 @@ on:
   pull_request:
     branches:
       - main
+
+# One Terraform state file means one run at a time. Merging a PR starts the pull_request
+# run and the push run within seconds of each other, both plan against the same remote
+# state, and the loser dies on a 409 "lease already present". Queue instead of cancelling:
+# a plan already in flight is doing useful work, and cancelling one mid-apply is worse.
+concurrency:
+  group: terraform-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
