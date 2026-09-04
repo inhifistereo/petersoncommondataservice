@@ -113,6 +113,12 @@ So the sequence is:
 The same applies to the managed TLS certificate for the custom domain, which is bound
 out-of-band and held behind `ignore_changes` in the custom domain resource.
 
+## What's next
+
+[docs/roadmap.md](docs/roadmap.md) tracks what is built, what is left, and what was
+deliberately ruled out — including the manual role grant Phase 6 will need and the Azure
+gotchas that are expensive to rediscover.
+
 ## Layout
 
 | Path | |
