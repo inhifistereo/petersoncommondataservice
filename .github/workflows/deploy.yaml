@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+# Only the checkout needs the token. Azure credentials arrive as secrets, not OIDC.
+permissions:
+  contents: read
+
 # One Terraform state file means one run at a time. Merging a PR starts the pull_request
 # run and the push run within seconds of each other, both plan against the same remote
 # state, and the loser dies on a 409 "lease already present". Queue instead of cancelling:
@@ -22,6 +26,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # Compile and test before building an image. Until now CI only ever built the app
+    # inside Docker and ran none of the tests, so a failure surfaced as a confusing
+    # container build error - or not at all.
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+
+    - name: Build
+      run: dotnet build -c Release
+
+    # Not "dotnet test": xunit.v3 runs on Microsoft.Testing.Platform and the .NET 10 SDK
+    # still routes dotnet test through the retired VSTest bridge, which fails.
+    - name: Test
+      run: dotnet run --project tests/PetersonCommonDataService.Tests -c Release
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -32,12 +52,14 @@ jobs:
         username: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
         password: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}
 
+    # Pull requests build the image to prove the Dockerfile still works, but must not
+    # push: doing so overwrote :latest in ACR from an unmerged branch. Only main publishes.
     - name: Build and push Docker image to ACR
       uses: docker/build-push-action@v5
       with:
         context: .
         file: infra/dockerfile
-        push: true
+        push: ${{ github.event_name == 'push' }}
         tags: |
           ${{ secrets.ACR_SERVER }}/petersoncommondataservice:${{ github.sha }}
           ${{ secrets.ACR_SERVER }}/petersoncommondataservice:latest
@@ -47,6 +69,9 @@ jobs:
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.12.x
+
+    - name: Terraform Format Check
+      run: terraform -chdir=infra/terraform fmt -check -recursive
 
     - name: Azure Login for Terraform
       uses: azure/login@v2
@@ -65,23 +90,25 @@ jobs:
                        -backend-config="client_id=${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}" \
                        -backend-config="client_secret=${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}"
 
+    - name: Terraform Validate
+      run: terraform -chdir=infra/terraform validate
+
+    # Secrets travel as TF_VAR_* environment variables rather than -var arguments. As
+    # arguments they end up in the process table and break on any value needing quoting.
     - name: Terraform Plan
-      run: |
-        cd infra/terraform
-        terraform plan -var="image_tag=${{ github.sha }}" \
-                       -var="api_keys=${{ secrets.API_KEYS }}" \
-                       -var="weather_latitude=${{ secrets.WEATHER_LATITUDE }}" \
-                       -var="weather_longitude=${{ secrets.WEATHER_LONGITUDE }}" \
-                       -var="ics_url=${{ secrets.ICS_URL }}" \
-                       -var="todoist_api_key=${{ secrets.TODOIST_API_KEY }}" \
-                       -var="todoist_project_id=${{ secrets.TODOIST_PROJECT_ID }}" \
-                       -var="domain_name=${{ secrets.TF_VAR_DOMAIN_NAME }}" \
-                       -var="subscription_id=${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}" \
-                       -var="tenant_id=${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}" \
-                       -out=tfplan
+      env:
+        TF_VAR_image_tag: ${{ github.sha }}
+        TF_VAR_api_keys: ${{ secrets.API_KEYS }}
+        TF_VAR_weather_latitude: ${{ secrets.WEATHER_LATITUDE }}
+        TF_VAR_weather_longitude: ${{ secrets.WEATHER_LONGITUDE }}
+        TF_VAR_ics_url: ${{ secrets.ICS_URL }}
+        TF_VAR_todoist_api_key: ${{ secrets.TODOIST_API_KEY }}
+        TF_VAR_todoist_project_id: ${{ secrets.TODOIST_PROJECT_ID }}
+        TF_VAR_domain_name: ${{ secrets.TF_VAR_DOMAIN_NAME }}
+        TF_VAR_subscription_id: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
+        TF_VAR_tenant_id: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
+      run: terraform -chdir=infra/terraform plan -out=tfplan
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: |
-        cd infra/terraform
-        terraform apply -auto-approve tfplan
+      run: terraform -chdir=infra/terraform apply -auto-approve tfplan

@@ -114,7 +114,6 @@ public sealed class ApiKeyTests : IClassFixture<ApiKeyTests.Factory>
     }
 
     [Theory]
-    [InlineData("/health")]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
     public async Task HealthEndpoints_AreReachableWithoutAKey(string path)

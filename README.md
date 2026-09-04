@@ -86,8 +86,8 @@ Two things stand in the way, and both are ordinary Azure facts rather than bugs 
 So the sequence is:
 
 1. Delete (or comment out) the `azurerm_role_assignment.acr_pull` resource in
-   [main.tf](infra/terraform/main.tf) **and its `import` block**. An import block aimed at
-   something that does not exist yet fails the plan.
+   [main.tf](infra/terraform/main.tf). Terraform cannot create it, so leaving it in place
+   only fails the apply.
 2. Run the deploy. The app is created; its first image pull fails, because it has no key
    to the registry yet. This is expected.
 3. Grant the role by hand, as a user with Owner or User Access Administrator:
@@ -104,11 +104,15 @@ So the sequence is:
 
 4. Re-run the deploy so a new revision starts and pulls successfully.
 5. Optionally put the grant back under Terraform's eye, so its removal is detected in
-   future: restore the resource and its `import` block, and set
-   `acr_pull_role_assignment_id` to the GUID of the assignment you just created —
-   `az role assignment list --scope "$ACR" --query "[].name" -o tsv`. The GUID is random
-   and differs every rebuild, so the default committed in
-   [variables.tf](infra/terraform/variables.tf) will be stale.
+   future. Restore the resource, then adopt the assignment you just made — either
+   `terraform import azurerm_role_assignment.acr_pull <id>`, or a temporary `import` block
+   carrying the same id, deleted once the apply succeeds. Find the id with:
+
+   ```sh
+   az role assignment list --scope "$ACR" --query "[?roleDefinitionName=='AcrPull'].id" -o tsv
+   ```
+
+   The GUID at the end is random and differs on every rebuild.
 
 The same applies to the managed TLS certificate for the custom domain, which is bound
 out-of-band and held behind `ignore_changes` in the custom domain resource.

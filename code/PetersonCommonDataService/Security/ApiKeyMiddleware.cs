@@ -29,7 +29,6 @@ public sealed class ApiKeyMiddleware(
     /// </summary>
     private static readonly HashSet<string> AnonymousPaths = new(StringComparer.OrdinalIgnoreCase)
     {
-        "/health",
         "/health/live",
         "/health/ready",
     };
