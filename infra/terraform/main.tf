@@ -243,27 +243,12 @@ resource "azurerm_container_app" "app" {
 #   - The grant depends on an identity that only exists once the app is created, but the
 #     app needs the grant to pull its first image. Breaking that cycle means moving to a
 #     user-assigned identity created ahead of the app.
+#
+# A rebuild therefore grants this by hand and then imports it; see the README.
 resource "azurerm_role_assignment" "acr_pull" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
   principal_id         = azurerm_container_app.app.identity[0].principal_id
-}
-
-# Transitional: adopts the existing hand-made assignment instead of trying to create a
-# duplicate, which Azure rejects with RoleAssignmentExists. Leaving this in place is
-# harmless on later runs - Terraform skips an import whose target is already in state -
-# but delete it once the apply on main has succeeded, because an import block pointed at
-# a resource that does not exist fails the plan, which is exactly the from-scratch case
-# this resource was added to support.
-import {
-  to = azurerm_role_assignment.acr_pull
-  id = "${local.acr_id}/providers/Microsoft.Authorization/roleAssignments/${var.acr_pull_role_assignment_id}"
-}
-
-locals {
-  # Built from variables rather than referenced off azurerm_container_registry.acr.id
-  # because an import block's id has to resolve at plan time, before any resource is read.
-  acr_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerRegistry/registries/${var.container_registry_name}"
 }
 
 resource "azurerm_container_app_custom_domain" "custom_domain" {

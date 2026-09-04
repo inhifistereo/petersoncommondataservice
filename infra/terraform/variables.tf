@@ -92,9 +92,3 @@ variable "log_analytics_daily_quota_gb" {
   type        = number
   default     = 1
 }
-
-variable "acr_pull_role_assignment_id" {
-  description = "GUID of the pre-existing AcrPull assignment on the registry, adopted by the import block in main.tf. Only read at plan time; delete it along with the import block once the assignment is in state."
-  type        = string
-  default     = "e75a3c83-e917-417c-a574-182f2c036eea"
-}

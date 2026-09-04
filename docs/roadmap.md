@@ -12,10 +12,8 @@ boring, resilient API that never blanks the wall display.
 | 3 — Caching | `CachedSource` with stale-on-error and single-flight. ETag / `If-None-Match` / 304, `Cache-Control`, `Age`. TTLs tuned to the 2-minute poll. |
 | 4 — API key auth | `X-Api-Key`, constant-time compare, `OPTIONS` exempt, health endpoints anonymous. |
 | 5 — Weather | NWS forecast, current conditions and alerts behind `IWeatherProvider`. |
-| 8 — Tests | 80 tests covering ICS semantics, the cache wrapper, task mapping, the wire contract and the key check. |
-
-Phase 7 is partly done: the AcrPull grant, resource tags, the Log Analytics daily cap, a
-stable `container_app_url`, and a concurrency group are all in place.
+| 7 — Infra and CI | The AcrPull grant, resource tags, the Log Analytics daily cap, a stable `container_app_url`, a concurrency group, gated image pushes, `TF_VAR_*` secrets, build and tests in CI, `fmt -check` and `validate`, and a `permissions:` block. |
+| 8 — Tests | 79 tests covering ICS semantics, the cache wrapper, task mapping, the wire contract and the key check. |
 
 ## Phase 6 — Photos
 
@@ -86,30 +84,11 @@ wifi. Resizing to the panel's native resolution cuts it roughly tenfold.
 
 Omit `takenAt` in v1 — it needs EXIF parsing or blob metadata set at upload.
 
-## Phase 7 — CI hardening (remainder)
-
-All in [deploy.yaml](../.github/workflows/deploy.yaml):
-
-- **Gate the image push.** Every PR currently overwrites `:latest` in ACR.
-- **Pass secrets as `TF_VAR_*` env vars** instead of interpolating into shell arguments,
-  where they land in process args and break on quoting.
-- **Build and test before the Docker build.** CI never compiles the app outside Docker and
-  runs none of the 80 tests. Note it is `dotnet run --project tests/…`, not `dotnet test`.
-- **Add `terraform fmt -check` and `terraform validate`.**
-- **Add a `permissions:` block** to narrow the default token.
-
 ## Housekeeping
 
-- Delete the `import` block for `azurerm_role_assignment.acr_pull` in
-  [main.tf](../infra/terraform/main.tf). It has done its job — the assignment is in state.
-  Leaving it is harmless on normal runs but fails the plan on a from-scratch rebuild,
-  which is the case the resource exists to support.
-- Delete the `/health` shim in `Program.cs`. Both probes now point at `/health/live`.
-- Rewrite or delete [deployment.md](deployment.md). It describes a .NET 8 `dotnet publish`
-  flow that bears no resemblance to the ACR and Terraform pipeline in use. Nothing links
-  to it any more.
 - `/health/ready` registers no checks and always answers healthy. Either wire it to
-  per-source freshness or drop it.
+  per-source freshness — last successful fetch age per cached source, `Degraded` when
+  serving stale — or drop it and let `meta.stale` carry that alone.
 
 ## Gotchas worth not rediscovering
 
@@ -124,6 +103,11 @@ All in [deploy.yaml](../.github/workflows/deploy.yaml):
 - **The image tag must be the commit SHA.** With `revision_mode = "Single"` and a fixed
   `:latest`, Terraform sees no change and never rolls a revision — a deploy appears to
   succeed while the old container keeps serving.
+- **NWS contradicts itself, and `/weather` passes that through faithfully.** A period can
+  carry a thunderstorm `icon` next to a `shortForecast` of "Patchy Fog". The display should
+  drive its icon from `condition` and treat `conditionText` as prose, without assuming the
+  two agree. Likewise the first `daily` entry has no `high` once the day's daytime period
+  has passed, so `high` must be allowed to be null.
 - **`.env` overwrites real environment variables** in Development, and `dotnet run`
   applies `launchSettings.json` over inherited environment. Use `--no-launch-profile`.
 

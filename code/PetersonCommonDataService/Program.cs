@@ -173,13 +173,6 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 });
 app.MapHealthChecks("/health/ready");
 
-// Retained so the existing Container Apps probes keep passing until Terraform
-// is updated to point at /health/live.
-app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
-{
-    Predicate = _ => false,
-});
-
 app.MapControllers();
 
 app.Run();
